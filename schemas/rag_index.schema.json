@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RagIndexRequest",
+  "type": "object",
+  "properties": {
+    "scan_run_id": { "type": ["string", "null"], "format": "uuid" },
+    "property_id": { "type": ["string", "null"], "format": "uuid" },
+    "country": { "type": ["string", "null"] }
+  },
+  "additionalProperties": false
+}

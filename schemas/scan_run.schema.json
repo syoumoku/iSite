@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ScanRun",
+  "type": "object",
+  "required": [
+    "run_id",
+    "scope",
+    "status",
+    "created_at"
+  ],
+  "properties": {
+    "run_id": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "created",
+        "running",
+        "completed",
+        "failed",
+        "cancelled"
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "scope": {
+      "type": "object",
+      "required": [
+        "level",
+        "countries",
+        "full_scan",
+        "output_formats"
+      ],
+      "properties": {
+        "level": {
+          "enum": [
+            "global",
+            "region",
+            "country",
+            "city"
+          ]
+        },
+        "regions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "countries": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "cities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "full_scan": {
+          "type": "boolean"
+        },
+        "scene_types": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "output_formats": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "excel",
+              "ppt",
+              "markdown",
+              "geojson"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

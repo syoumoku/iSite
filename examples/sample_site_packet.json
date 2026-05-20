@@ -1,0 +1,65 @@
+{
+  "entity": {
+    "country": "Exampleland",
+    "city": "Example City",
+    "property_name": "Example International Airport Terminal 1",
+    "scene_type": "airport_terminal",
+    "scene_form": "Indoor",
+    "latitude": 35.0,
+    "longitude": 139.0,
+    "geocode_precision": "terminal centroid",
+    "google_maps_link": "https://www.google.com/maps/search/?api=1&query=35.000000,139.000000"
+  },
+  "scene": {
+    "area_metric_name": "Terminal Area",
+    "area_metric_status": "Proxy",
+    "primary_value_indicators": [
+      "annual_passenger_throughput",
+      "terminal_role"
+    ],
+    "proxy_basis": "Airport Passenger Throughput Proxy",
+    "proxy_level": "P1 Strong Proxy",
+    "annual_visits_est": 12000000
+  },
+  "evidence": [
+    {
+      "property_id": "00000000-0000-0000-0000-000000000000",
+      "field_group": "annual_passenger_throughput",
+      "field_value": "12,000,000 passengers (2024)",
+      "indicator_name": "annual_passenger_throughput",
+      "unit": "passengers/year",
+      "source_name": "Example Airport Annual Report",
+      "source_tier": "Tier 1",
+      "source_url": "https://example.com/report",
+      "source_date": "2024",
+      "evidence_type": "Direct",
+      "cross_check_status": "Single Source"
+    }
+  ],
+  "build_status": {
+    "indoor_system_presence": "Unknown",
+    "indoor_system_type": "Unknown",
+    "indoor_rat": "Unknown",
+    "build_evidence_status": "Unknown"
+  },
+  "demand": {
+    "daily_visits": 32876.71,
+    "attach_rate": 0.8,
+    "indoor_capture": 0.9,
+    "busy_hour_factor": 0.1,
+    "gb_per_user_busy_hour": 0.55,
+    "busy_hour_users": 2367.12,
+    "busy_hour_traffic_gb": 1301.92,
+    "busy_hour_bandwidth_mbps": 2962.31
+  },
+  "inference": [],
+  "conclusion": {
+    "evidence_status": "Supported",
+    "value_class": "City Core",
+    "action_class": "Survey First",
+    "recommended_solution": "pRRU",
+    "reason_to_recommend": "门户机场，年客流：12,000,000人次，航站楼室内连续覆盖需求明确，推荐pRRU。",
+    "risk_review_reason": "室分建设状态无公开证据",
+    "next_action": "补查运营商/机场室内5G或DAS建设公告。"
+  }
+}

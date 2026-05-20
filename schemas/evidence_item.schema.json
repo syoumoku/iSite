@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EvidenceItem",
+  "type": "object",
+  "required": [
+    "property_id",
+    "field_group",
+    "field_value",
+    "source_name",
+    "source_tier",
+    "source_url",
+    "source_date",
+    "evidence_type",
+    "cross_check_status"
+  ],
+  "properties": {
+    "property_id": {
+      "type": "string"
+    },
+    "field_group": {
+      "type": "string"
+    },
+    "field_value": {
+      "type": "string"
+    },
+    "indicator_name": {
+      "type": "string"
+    },
+    "unit": {
+      "type": "string"
+    },
+    "source_name": {
+      "type": "string"
+    },
+    "source_tier": {
+      "enum": [
+        "Tier 1",
+        "Tier 2",
+        "Tier 3"
+      ]
+    },
+    "source_url": {
+      "type": "string"
+    },
+    "source_date": {
+      "type": "string"
+    },
+    "evidence_type": {
+      "enum": [
+        "Direct",
+        "Proxy",
+        "Inferred"
+      ]
+    },
+    "cross_check_status": {
+      "enum": [
+        "Strong Cross-check",
+        "Partial Cross-check",
+        "Single Source",
+        "Evidence Conflict",
+        "Not Checked"
+      ]
+    },
+    "assumption_note": {
+      "type": "string"
+    }
+  }
+}

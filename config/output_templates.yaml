@@ -1,0 +1,113 @@
+version: "0.1"
+excel:
+  required_sheets:
+    - 主表
+    - 证据表
+    - 推测留痕
+    - Proxy模型
+    - 复核队列
+    - 国家汇总
+    - 方法说明
+    - 机场
+    - 会展中心
+    - 商场_Mixed_use
+    - 体育场
+    - 酒店_MICE
+    - 办公_政府
+    - 医院
+    - 大学
+    - 交通枢纽
+  main_columns:
+    - 国家
+    - 城市
+    - 物业名
+    - 经度
+    - 纬度
+    - 场景类型
+    - 物业点重要证据
+    - 年访问量估计（基于Proxy）
+    - 忙时流量（GB/h，基于Proxy）
+    - 当前有无室分建设
+    - 建设制式（4G/5G）
+    - 建设运营商
+    - 室分类型
+    - 证据提纯批次
+    - 证据状态
+    - 推荐理由
+    - 下一步核验动作
+    - Google地图链接
+  evidence_columns:
+    - 行号
+    - 国家
+    - 城市
+    - 物业名
+    - 场景类型
+    - 字段组
+    - 字段值
+    - 证据类型 / Proxy Basis
+    - 证据等级
+    - 来源1链接
+    - 来源2链接
+    - 交叉校验状态
+  inference_columns:
+    - 行号
+    - 国家
+    - 物业名
+    - 推测字段
+    - 推测值
+    - 推测依据
+    - 推测链路
+    - 推测置信度
+  proxy_model_columns:
+    - 场景类型
+    - 主要高价值证明指标
+    - 面积/尺度字段
+    - 年访问量Proxy
+    - attach_rate
+    - indoor_capture
+    - busy_hour_factor
+    - GB/user/BH
+  review_queue_columns:
+    - 行号
+    - 国家
+    - 城市
+    - 物业名
+    - 复核原因
+    - 下一步动作
+  country_summary_columns:
+    - 国家
+    - 候选点数量
+    - 机场
+    - 会展中心
+    - 商场/Mixed-use
+    - 体育场
+    - 酒店/MICE
+    - 办公/政府
+    - 医院
+    - 大学
+    - 交通枢纽
+  sorting_rules:
+    main_table: 主表物业点按年访问量估计（基于Proxy）从高到低排序；缺失年访问量的物业点排在末尾。
+    scene_sheets: 各场景分表按该场景已选物业点重要证据中的主指标数值从高到低排序；缺失或非数值主指标的物业点排在末尾。
+ppt_card:
+  required_fields:
+    - site_name
+    - country
+    - city
+    - scene_type
+    - recommended_solution
+    - evidence_status
+    - value_class
+    - action_class
+    - core_objective_metric
+    - busy_hour_users
+    - busy_hour_traffic_gb
+    - busy_hour_bandwidth_mbps
+    - area_or_scale_metric
+    - latitude
+    - longitude
+    - geocode_precision
+    - build_status
+    - value_judgment_short_sentence
+    - risk_and_next_action
+    - evidence_entries

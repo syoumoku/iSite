@@ -1,0 +1,370 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SitePacket",
+  "type": "object",
+  "required": [
+    "entity",
+    "scene",
+    "evidence",
+    "build_status",
+    "conclusion"
+  ],
+  "properties": {
+    "entity": {
+      "type": "object",
+      "required": [
+        "country",
+        "city",
+        "property_name",
+        "scene_type",
+        "latitude",
+        "longitude",
+        "geocode_precision"
+      ],
+      "properties": {
+        "country": {
+          "type": "string"
+        },
+        "city": {
+          "type": "string"
+        },
+        "property_name": {
+          "type": "string"
+        },
+        "scene_type": {
+          "type": "string"
+        },
+        "scene_form": {
+          "enum": [
+            "Indoor",
+            "Semi-open"
+          ]
+        },
+        "latitude": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "longitude": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180
+        },
+        "geocode_precision": {
+          "type": "string"
+        },
+        "google_maps_link": {
+          "type": "string"
+        },
+        "coordinate_status": {
+          "type": "string"
+        },
+        "map_source": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "map_source_date": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "scene": {
+      "type": "object",
+      "required": [
+        "area_metric_name",
+        "area_metric_status",
+        "proxy_basis",
+        "proxy_level"
+      ],
+      "properties": {
+        "area_metric_name": {
+          "type": "string"
+        },
+        "area_metric_value": {
+          "type": [
+            "number",
+            "string",
+            "null"
+          ]
+        },
+        "area_metric_unit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "area_metric_status": {
+          "enum": [
+            "Direct",
+            "Proxy",
+            "Inferred",
+            "Unknown"
+          ]
+        },
+        "primary_value_indicators": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "proxy_basis": {
+          "type": "string"
+        },
+        "proxy_level": {
+          "enum": [
+            "P0 Direct",
+            "P1 Strong Proxy",
+            "P2 Moderate Proxy",
+            "P3 Weak Proxy"
+          ]
+        },
+        "annual_visits_est": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "$ref": "./evidence_item.schema.json"
+      }
+    },
+    "build_status": {
+      "type": "object",
+      "required": [
+        "indoor_system_presence",
+        "indoor_system_type",
+        "indoor_rat",
+        "build_evidence_status"
+      ],
+      "properties": {
+        "indoor_system_presence": {
+          "type": "string"
+        },
+        "indoor_system_type": {
+          "type": "string"
+        },
+        "indoor_rat": {
+          "type": "string"
+        },
+        "build_evidence_status": {
+          "type": "string"
+        },
+        "build_source": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "build_source_date": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "demand": {
+      "type": "object",
+      "properties": {
+        "daily_visits": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "attach_rate": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "indoor_capture": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "busy_hour_factor": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "gb_per_user_busy_hour": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "busy_hour_users": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "busy_hour_traffic_gb": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "busy_hour_bandwidth_mbps": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      }
+    },
+    "inference": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "conclusion": {
+      "type": "object",
+      "required": [
+        "evidence_status",
+        "value_class",
+        "action_class",
+        "recommended_solution",
+        "reason_to_recommend",
+        "next_action"
+      ],
+      "properties": {
+        "evidence_status": {
+          "enum": [
+            "Verified",
+            "Supported",
+            "Indicative",
+            "Insufficient"
+          ]
+        },
+        "value_class": {
+          "type": "string"
+        },
+        "action_class": {
+          "type": "string"
+        },
+        "recommended_solution": {
+          "type": "string"
+        },
+        "reason_to_recommend": {
+          "type": "string"
+        },
+        "risk_review_reason": {
+          "type": "string"
+        },
+        "next_action": {
+          "type": "string"
+        }
+      }
+    },
+    "review_queue": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "reason",
+          "next_action",
+          "status"
+        ],
+        "properties": {
+          "reason": {
+            "type": "string"
+          },
+          "next_action": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "review_type": {
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "critical"
+            ]
+          },
+          "gate_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "field_path": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "blocking_surfaces": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "source_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "suggested_query": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "candidate_quality_status": {
+      "enum": [
+        "ready",
+        "review_required",
+        "blocked_quality"
+      ]
+    },
+    "visibility": {
+      "type": "object",
+      "properties": {
+        "raw_pool": {
+          "type": "boolean"
+        },
+        "review_required": {
+          "type": "boolean"
+        },
+        "main_table_ready": {
+          "type": "boolean"
+        },
+        "map_ready": {
+          "type": "boolean"
+        },
+        "export_ready": {
+          "type": "boolean"
+        }
+      }
+    },
+    "quality_issues": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

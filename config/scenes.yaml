@@ -1,0 +1,132 @@
+version: "0.1"
+scenes:
+  airport_terminal:
+    label_zh: 机场
+    scene_form: Indoor
+    primary_indicators: [annual_passenger_throughput, passenger_throughput, terminal_capacity, international_passenger_share]
+    area_metric: Terminal Area
+    fallback_metrics: [terminal_gfa, waiting_area, passenger_capacity]
+    proxy_basis: [Direct Observed Metric, Airport Passenger Throughput Proxy, Terminal Role × Airport Throughput Proxy]
+    default_solution: pRRU
+    demand_parameters:
+      attach_rate: [0.75, 0.85]
+      indoor_capture: [0.85, 0.95]
+      busy_hour_factor: [0.08, 0.12]
+      gb_per_user_busy_hour: [0.45, 0.65]
+  convention_center:
+    label_zh: 会展中心
+    scene_form: Indoor
+    primary_indicators: [exhibition_area, meeting_area, annual_events, international_event_frequency, peak_event_capacity]
+    area_metric: Exhibition Area
+    fallback_metrics: [meeting_area, hall_count, peak_event_capacity]
+    proxy_basis: [Direct Observed Metric, Venue Scale × Event Frequency Proxy, Exhibition Area × Event Calendar Proxy]
+    default_solution: pRRU
+    demand_parameters:
+      attach_rate: [0.70, 0.85]
+      indoor_capture: [0.80, 0.95]
+      busy_hour_factor: [0.10, 0.20]
+      gb_per_user_busy_hour: [0.40, 0.70]
+  stadium:
+    label_zh: 体育场
+    scene_form: Semi-open
+    primary_indicators: [seat_count, event_days, international_events, main_venue_role]
+    area_metric: Seat Count
+    fallback_metrics: [bowl_concourse_area, peak_entry_capacity]
+    proxy_basis: [Direct Observed Metric, Seats × Event Days × Occupancy Proxy, Seats × Event Intensity Proxy]
+    default_solution: hRRU
+    demand_parameters:
+      attach_rate: [0.75, 0.90]
+      indoor_capture: [0.55, 0.80]
+      busy_hour_factor: [0.18, 0.35]
+      gb_per_user_busy_hour: [0.50, 0.90]
+  luxury_hotel_mice:
+    label_zh: 酒店_MICE
+    scene_form: Indoor
+    primary_indicators: [hotel_class, brand, keys, meeting_ballroom_area, ballroom_capacity]
+    area_metric: Keys
+    fallback_metrics: [meeting_ballroom_area, ballroom_capacity, hotel_gfa]
+    proxy_basis: [Direct Observed Metric, Rooms + MICE Intensity Proxy, Keys × Occupancy × Event Load Proxy]
+    default_solution: pRRU
+    demand_parameters:
+      attach_rate: [0.60, 0.80]
+      indoor_capture: [0.75, 0.90]
+      busy_hour_factor: [0.06, 0.12]
+      gb_per_user_busy_hour: [0.30, 0.55]
+  mall_mixed_use:
+    label_zh: 商场_Mixed_use
+    scene_form: Indoor
+    primary_indicators: [gla, annual_footfall, flagship_position, anchor_brands, urban_catchment]
+    area_metric: GLA
+    fallback_metrics: [nla, retail_gfa, mixed_use_area]
+    proxy_basis: [Direct Observed Metric, Retail GLA × Urban Catchment Proxy, Flagship Position × Retail Scale Proxy, Mixed-use Footfall Proxy]
+    default_solution: pRRU
+    demand_parameters:
+      attach_rate: [0.65, 0.85]
+      indoor_capture: [0.80, 0.95]
+      busy_hour_factor: [0.10, 0.18]
+      gb_per_user_busy_hour: [0.35, 0.60]
+  office_government:
+    label_zh: 办公_政府
+    scene_form: Indoor
+    primary_indicators: [office_nla, office_gfa, building_grade, tenant_quality, hq_density, cbd_role]
+    area_metric: NLA
+    fallback_metrics: [office_gfa, floor_count, tower_height, site_area]
+    proxy_basis: [Direct Observed Metric, Office Area × Tenant Quality Proxy, HQ Density + Visitor Flow Proxy, CBD Landmark Office Proxy, Institutional Importance × Building Scale Proxy]
+    default_solution: pRRU
+    demand_parameters:
+      attach_rate: [0.65, 0.85]
+      indoor_capture: [0.80, 0.95]
+      busy_hour_factor: [0.10, 0.18]
+      gb_per_user_busy_hour: [0.35, 0.60]
+  hospital:
+    label_zh: 医院
+    scene_form: Indoor
+    primary_indicators: [beds, outpatient_volume, hospital_grade, referral_role, emergency_icu_surgery_intensity]
+    area_metric: Beds
+    fallback_metrics: [main_building_gfa, campus_area, outpatient_volume]
+    proxy_basis: [Direct Observed Metric, Beds + Outpatient Volume Proxy, Hospital Scale × Service Intensity Proxy]
+    default_solution: pRRU
+    demand_parameters:
+      attach_rate: [0.60, 0.80]
+      indoor_capture: [0.80, 0.95]
+      busy_hour_factor: [0.08, 0.15]
+      gb_per_user_busy_hour: [0.30, 0.50]
+  university:
+    label_zh: 大学
+    scene_form: Indoor
+    primary_indicators: [enrollment, core_facility_intensity, campus_center_role]
+    area_metric: Core Facility Area
+    fallback_metrics: [enrollment, campus_population]
+    proxy_basis: [Direct Observed Metric, Enrollment × Core Facility Proxy, Campus Population × Teaching Intensity Proxy]
+    default_solution: pRRU
+    demand_parameters:
+      attach_rate: [0.60, 0.80]
+      indoor_capture: [0.80, 0.95]
+      busy_hour_factor: [0.08, 0.15]
+      gb_per_user_busy_hour: [0.30, 0.50]
+  transport_hub:
+    label_zh: 交通枢纽
+    scene_form: Indoor
+    primary_indicators: [daily_ridership, interchange_volume, line_count, hub_role]
+    area_metric: Station/Concourse Area
+    fallback_metrics: [daily_ridership, interchange_depth]
+    proxy_basis: [Direct Observed Metric, Station Ridership Proxy, Interchange Role × Ridership Proxy]
+    default_solution: pRRU
+    demand_parameters:
+      attach_rate: [0.70, 0.85]
+      indoor_capture: [0.85, 0.95]
+      busy_hour_factor: [0.10, 0.20]
+      gb_per_user_busy_hour: [0.35, 0.60]
+  cruise_port:
+    label_zh: 港口_邮轮码头
+    scene_form: Indoor
+    primary_indicators: [passenger_throughput, terminal_role, international_cruise_frequency]
+    area_metric: Terminal Area
+    fallback_metrics: [passenger_throughput, berth_role]
+    proxy_basis: [Direct Observed Metric, Passenger Throughput Proxy, Terminal Role × Passenger Throughput Proxy]
+    default_solution: pRRU
+    demand_parameters:
+      attach_rate: [0.70, 0.85]
+      indoor_capture: [0.80, 0.95]
+      busy_hour_factor: [0.10, 0.20]
+      gb_per_user_busy_hour: [0.35, 0.60]

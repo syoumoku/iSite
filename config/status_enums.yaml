@@ -1,0 +1,60 @@
+evidence_status:
+  - Verified
+  - Supported
+  - Indicative
+  - Insufficient
+value_class:
+  - National Flagship
+  - City Core
+  - Regional Anchor
+  - Local Candidate
+  - Observation
+action_class:
+  - Direct Recommend
+  - Survey First
+  - Review Queue
+  - Monitor
+indoor_system_presence:
+  - Confirmed Present
+  - Confirmed Absent
+  - Likely Present
+  - Likely Absent
+  - No Public Evidence
+  - Planned / Under Construction
+  - Unknown
+indoor_system_type:
+  - Traditional DAS
+  - Digital DAS
+  - Hybrid DAS
+  - Small Cells / Other Indoor System
+  - Unknown
+indoor_rat:
+  - 4G
+  - 5G
+  - 4G+5G
+  - Multi-RAT Legacy
+  - Unknown
+build_evidence_status:
+  - Verified
+  - Supported
+  - Indicative
+  - Unknown
+proxy_level:
+  - P0 Direct
+  - P1 Strong Proxy
+  - P2 Moderate Proxy
+  - P3 Weak Proxy
+source_tier:
+  - Tier 1
+  - Tier 2
+  - Tier 3
+cross_check_status:
+  - Strong Cross-check
+  - Partial Cross-check
+  - Single Source
+  - Evidence Conflict
+  - Not Checked
+recommended_solution:
+  - pRRU
+  - hRRU
+  - Unknown

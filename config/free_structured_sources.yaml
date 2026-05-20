@@ -1,0 +1,201 @@
+version: "0.1"
+purpose: "Structured-first public evidence source matrix used before Firecrawl gap fill."
+
+defaults:
+  cost_class: "free"
+  firecrawl_replacement: true
+  require_cache_write: true
+  compliance:
+    - "Use public APIs, public CSVs, open data catalogs, or official report indexes."
+    - "Do not bypass login, captcha, paywalls, robots.txt, or restricted sources."
+    - "Keep source URL, source date, and extraction method for every accepted evidence item."
+
+execution_order:
+  - identity_index
+  - wikidata_sparql
+  - wikipedia_mediawiki_api
+  - dbpedia_sparql
+  - ourairports_csv
+  - openstreetmap_overpass
+  - official_open_data_catalogs
+  - official_report_index
+  - firecrawl_gap_fill
+
+sources:
+  identity_index:
+    name: "Known Opportunity Index"
+    connector: "local_identity_index"
+    stage: "identity"
+    cost_class: "free"
+    network_required: false
+    firecrawl_replacement: true
+    evidence_roles: ["dedupe", "known_url_skip", "known_property_skip"]
+    hard_metric_scenes: {}
+
+  wikidata_sparql:
+    name: "Wikidata Query Service"
+    connector: "sparql"
+    stage: "structured_metric"
+    cost_class: "free"
+    network_required: true
+    trust_tier: 3
+    firecrawl_replacement: true
+    evidence_roles: ["identity", "coordinates", "image", "structured_metric"]
+    hard_metric_scenes:
+      airport_terminal: ["annual_passenger_throughput"]
+      mall_mixed_use: ["gla", "mixed_use_area"]
+      luxury_hotel_mice: ["rooms", "keys"]
+      office_government: ["office_gfa", "office_nla"]
+
+  wikipedia_mediawiki_api:
+    name: "Wikipedia MediaWiki API"
+    connector: "mediawiki_api"
+    stage: "structured_profile"
+    cost_class: "free"
+    network_required: true
+    trust_tier: 3
+    firecrawl_replacement: true
+    evidence_roles: ["identity", "coordinates", "image", "infobox_metric", "source_links"]
+    hard_metric_scenes:
+      airport_terminal: ["annual_passenger_throughput", "passenger_throughput"]
+      stadium: ["seat_count", "capacity"]
+      convention_center: ["exhibition_area", "peak_event_capacity"]
+      mall_mixed_use: ["gla", "annual_footfall"]
+      luxury_hotel_mice: ["rooms", "meeting_ballroom_area"]
+      transport_hub: ["ridership", "daily_ridership"]
+      hospital: ["beds"]
+      university: ["students", "enrollment"]
+
+  dbpedia_sparql:
+    name: "DBpedia SPARQL"
+    connector: "sparql"
+    stage: "structured_profile"
+    cost_class: "free"
+    network_required: true
+    trust_tier: 3
+    firecrawl_replacement: true
+    evidence_roles: ["identity", "coordinates", "infobox_metric", "cross_check"]
+    hard_metric_scenes:
+      airport_terminal: ["passenger_throughput"]
+      stadium: ["seat_count", "capacity"]
+      convention_center: ["capacity"]
+      luxury_hotel_mice: ["rooms"]
+      hospital: ["beds"]
+      university: ["students"]
+
+  ourairports_csv:
+    name: "OurAirports CSV"
+    connector: "public_csv"
+    stage: "structured_identity"
+    cost_class: "free"
+    network_required: true
+    trust_tier: 3
+    firecrawl_replacement: true
+    evidence_roles: ["airport_identity", "airport_coordinates", "iata_icao_cross_check"]
+    hard_metric_scenes:
+      airport_terminal: []
+
+  openstreetmap_overpass:
+    name: "OpenStreetMap Overpass"
+    connector: "overpass"
+    stage: "structured_identity"
+    cost_class: "free"
+    network_required: true
+    trust_tier: 3
+    firecrawl_replacement: true
+    evidence_roles: ["identity", "coordinates", "tags", "duplicate_check"]
+    hard_metric_scenes:
+      airport_terminal: []
+      stadium: ["capacity"]
+      convention_center: ["capacity"]
+      mall_mixed_use: []
+      luxury_hotel_mice: ["rooms"]
+      transport_hub: []
+      hospital: ["beds"]
+      university: ["students"]
+
+  official_open_data_catalogs:
+    name: "Official Open Data Catalog APIs"
+    connector: "ckan_socrata_catalog"
+    stage: "official_catalog"
+    cost_class: "free"
+    network_required: true
+    trust_tier: 1
+    firecrawl_replacement: true
+    evidence_roles: ["official_metric_dataset", "official_report_url", "source_date"]
+    hard_metric_scenes:
+      airport_terminal: ["annual_passenger_throughput", "passenger_throughput"]
+      transport_hub: ["daily_ridership", "ridership"]
+      stadium: ["seat_count"]
+      convention_center: ["exhibition_area", "peak_event_capacity"]
+      hospital: ["beds", "outpatient_volume"]
+      university: ["students", "enrollment"]
+
+  official_report_index:
+    name: "Official Report Index"
+    connector: "public_http_index"
+    stage: "official_report"
+    cost_class: "free"
+    network_required: true
+    trust_tier: 1
+    firecrawl_replacement: true
+    evidence_roles: ["annual_report", "factsheet", "operator_kpi_page"]
+    hard_metric_scenes:
+      airport_terminal: ["annual_passenger_throughput", "terminal_capacity", "international_passenger_share"]
+      stadium: ["seat_count"]
+      convention_center: ["exhibition_area", "meeting_area", "peak_event_capacity"]
+      mall_mixed_use: ["gla", "annual_footfall"]
+      luxury_hotel_mice: ["rooms", "meeting_ballroom_area", "ballroom_capacity"]
+      office_government: ["office_gfa", "office_nla"]
+      transport_hub: ["daily_ridership", "ridership"]
+      hospital: ["beds", "outpatient_volume"]
+      university: ["students", "enrollment"]
+
+  firecrawl_gap_fill:
+    name: "Firecrawl Gap Fill"
+    connector: "firecrawl_search_scrape"
+    stage: "paid_gap_fill"
+    cost_class: "paid"
+    network_required: true
+    trust_tier: null
+    firecrawl_replacement: false
+    evidence_roles: ["last_resort_search", "last_resort_scrape"]
+    hard_metric_scenes:
+      airport_terminal: ["annual_passenger_throughput", "passenger_throughput", "terminal_capacity", "international_passenger_share"]
+      stadium: ["seat_count"]
+      convention_center: ["exhibition_area", "meeting_area", "peak_event_capacity"]
+      mall_mixed_use: ["gla", "annual_footfall"]
+      luxury_hotel_mice: ["rooms", "meeting_ballroom_area", "ballroom_capacity"]
+      office_government: ["office_gfa", "office_nla"]
+      transport_hub: ["daily_ridership", "ridership"]
+      hospital: ["beds", "outpatient_volume"]
+      university: ["students", "enrollment"]
+
+scene_source_matrix:
+  airport_terminal:
+    primary_sources: ["wikidata_sparql", "wikipedia_mediawiki_api", "official_open_data_catalogs", "official_report_index"]
+    identity_sources: ["ourairports_csv", "openstreetmap_overpass"]
+  stadium:
+    primary_sources: ["wikipedia_mediawiki_api", "dbpedia_sparql", "openstreetmap_overpass", "official_report_index"]
+    identity_sources: ["openstreetmap_overpass"]
+  convention_center:
+    primary_sources: ["wikipedia_mediawiki_api", "openstreetmap_overpass", "official_open_data_catalogs", "official_report_index"]
+    identity_sources: ["openstreetmap_overpass"]
+  mall_mixed_use:
+    primary_sources: ["wikidata_sparql", "wikipedia_mediawiki_api", "official_report_index"]
+    identity_sources: ["openstreetmap_overpass"]
+  luxury_hotel_mice:
+    primary_sources: ["wikidata_sparql", "wikipedia_mediawiki_api", "openstreetmap_overpass", "official_report_index"]
+    identity_sources: ["openstreetmap_overpass"]
+  office_government:
+    primary_sources: ["wikidata_sparql", "official_report_index"]
+    identity_sources: ["openstreetmap_overpass"]
+  transport_hub:
+    primary_sources: ["wikipedia_mediawiki_api", "official_open_data_catalogs", "official_report_index"]
+    identity_sources: ["openstreetmap_overpass"]
+  hospital:
+    primary_sources: ["wikipedia_mediawiki_api", "dbpedia_sparql", "openstreetmap_overpass", "official_open_data_catalogs"]
+    identity_sources: ["openstreetmap_overpass"]
+  university:
+    primary_sources: ["wikipedia_mediawiki_api", "dbpedia_sparql", "openstreetmap_overpass", "official_open_data_catalogs"]
+    identity_sources: ["openstreetmap_overpass"]

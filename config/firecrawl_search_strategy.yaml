@@ -1,0 +1,397 @@
+version: "0.1"
+purpose: "Guide Firecrawl discovery, evidence strengthening, media enrichment, and independent build-status searches."
+
+defaults:
+  command: search
+  limit: 3
+  scrape: false
+  firecrawl_role: "last_resort_gap_fill"
+  scrape_formats:
+    - markdown
+  country_parameter: true
+  cache_outputs_under: ".firecrawl/{country_slug}/{phase}/"
+
+phases:
+  discovery:
+    description: "Build the raw candidate pool. Top N is display-only and must not truncate stored candidates."
+    required_placeholders:
+      - country
+  metric_extraction:
+    description: "Find objective scene metrics for candidate ranking and demand modeling."
+    required_placeholders:
+      - country
+      - property_name
+  second_source_strengthening:
+    description: "Run when a candidate has only one Tier 3 source, proxy-only evidence, or source conflicts."
+    required_placeholders:
+      - country
+      - property_name
+  media_map_enrichment:
+    description: "Find public hero images, map/entity pages, and property-level coordinates."
+    required_placeholders:
+      - country
+      - property_name
+  build_status_search:
+    description: "Search indoor DAS/5G/build evidence separately from property value evidence."
+    required_placeholders:
+      - country
+      - property_name
+
+source_tier_policy:
+  tier_1:
+    - official authority or regulator KPI/statistics page
+    - official venue owner/operator KPI page
+    - government statistics portal or annual report
+  tier_2:
+    - official project page
+    - developer/operator portfolio page
+    - university/hospital official profile page
+    - recognized contractor or institutional partner page
+  tier_3:
+    - Wikipedia or Wikimedia
+    - specialist public directory
+    - travel/event directory
+    - map/geocode profile
+    - public aggregator
+
+evidence_acceptance_rules:
+  - "Every surfaced candidate must have a property-level name, coordinate, hero image, and objective scene metric."
+  - "A candidate passes the evidence gate with at least one Tier 1/2 source or two independent Tier 3 sources."
+  - "Official identity/profile pages strengthen entity evidence but do not prove numeric demand metrics unless the metric is explicit."
+  - "Do not label total development area as retail GLA; use mixed_use_area and Proxy unless GLA is explicitly stated."
+  - "Keep high-value property evidence separate from indoor build-status evidence."
+  - "When second-source metrics conflict, keep the candidate but add a review action for official/operator confirmation."
+  - "Old/new venue lifecycle changes must be flagged before exporting a final recommendation."
+
+source_rejection_rules:
+  - "Do not bypass login, captcha, robots.txt, paywalls, or restricted sources."
+  - "Do not collect irrelevant personal information."
+  - "Do not promote Facebook/social snippets as final metric evidence unless no safer source exists; keep them as review hints."
+  - "Do not use map geocode results alone as property value evidence."
+  - "Do not use generic country/city/topic pages as property evidence."
+
+scene_strategies:
+  airport_terminal:
+    scan_priority: 0
+    priority_band: primary_landmark
+    objective_indicators:
+      - annual_passenger_throughput
+      - passenger_throughput
+      - terminal_capacity
+      - international_passenger_share
+    discovery_queries:
+      - "{country} airport passenger traffic terminal official annual report"
+      - "{country} busiest airports passenger traffic CEIC"
+      - "{country} airport passenger statistics civil aviation authority"
+    candidate_metric_queries:
+      - "{property_name} passenger traffic official annual report"
+      - "{property_name} annual passengers CEIC"
+      - "{property_name} terminal passengers civil aviation authority"
+    strengthening_queries:
+      - "{property_name} passenger throughput second source"
+      - "{property_name} terminal capacity passengers official"
+    preferred_channels:
+      - airport authority
+      - airport company
+      - civil aviation statistics
+      - official annual report
+    fallback_channels:
+      - CEIC
+      - IFC or government PPP page
+      - Wikipedia/Wikimedia for image and coordinates
+    build_status_queries:
+      - "{property_name} indoor 5G coverage operator announcement"
+      - "{property_name} DAS distributed antenna system mobile operator"
+
+  convention_center:
+    scan_priority: 10
+    priority_band: primary_landmark
+    objective_indicators:
+      - exhibition_area
+      - meeting_area
+      - annual_events
+      - peak_event_capacity
+      - plenary_capacity
+    discovery_queries:
+      - "{country} convention center official exhibition area capacity"
+      - "{country} exhibition center meeting space Cvent Northstar"
+      - "{country} international conference center venue capacity"
+    candidate_metric_queries:
+      - "{property_name} exhibition area official"
+      - "{property_name} meeting space capacity official"
+      - "{property_name} venue details Cvent Northstar"
+    strengthening_queries:
+      - "{property_name} capacity official government project"
+      - "{property_name} meeting space second source"
+    preferred_channels:
+      - official venue site
+      - government project page
+      - venue operator
+    fallback_channels:
+      - Cvent
+      - Northstar Meetings Group
+      - event organizer venue pages
+    build_status_queries:
+      - "{property_name} indoor 5G coverage operator announcement"
+      - "{property_name} convention center DAS indoor network mobile operator"
+
+  stadium:
+    scan_priority: 30
+    priority_band: primary_landmark
+    objective_indicators:
+      - seat_count
+      - event_days
+      - international_events
+      - main_venue_role
+    discovery_queries:
+      - "{country} national stadium official capacity seats"
+      - "{country} largest stadium capacity StadiumDB"
+      - "{country} football stadium capacity Transfermarkt"
+    candidate_metric_queries:
+      - "{property_name} capacity official"
+      - "{property_name} capacity StadiumDB"
+      - "{property_name} capacity Transfermarkt"
+      - "{property_name} capacity National Football Teams"
+    strengthening_queries:
+      - "{property_name} capacity second source"
+      - "{property_name} club stadium capacity"
+      - "{property_name} seats Football Ground Map"
+    preferred_channels:
+      - stadium authority
+      - club official page
+      - tournament venue page
+    fallback_channels:
+      - StadiumDB
+      - Transfermarkt
+      - National Football Teams
+      - Football Ground Map
+      - TheSportsDB
+      - SoccerWiki
+    build_status_queries:
+      - "{property_name} stadium indoor 5G coverage operator announcement"
+      - "{property_name} distributed antenna system mobile operator"
+
+  luxury_hotel_mice:
+    scan_priority: 20
+    priority_band: primary_landmark
+    objective_indicators:
+      - keys
+      - rooms
+      - meeting_ballroom_area
+      - ballroom_capacity
+    discovery_queries:
+      - "{country} conference hotel official rooms ballroom capacity"
+      - "{country} luxury hotel meeting space ballroom capacity official"
+      - "{country} five star hotel rooms conference facilities"
+    candidate_metric_queries:
+      - "{property_name} rooms ballroom capacity official"
+      - "{property_name} meeting space factsheet"
+      - "{property_name} hotel keys meeting capacity"
+    strengthening_queries:
+      - "{property_name} official factsheet rooms meeting space"
+      - "{property_name} Cvent ballroom capacity"
+    preferred_channels:
+      - hotel brand official site
+      - hotel factsheet
+      - operator portfolio
+    fallback_channels:
+      - Cvent
+      - Northstar Meetings Group
+      - booking/travel profiles for identity only
+    build_status_queries:
+      - "{property_name} hotel indoor 5G coverage operator announcement"
+      - "{property_name} hotel DAS indoor mobile network"
+
+  mall_mixed_use:
+    scan_priority: 60
+    priority_band: secondary_landmark
+    objective_indicators:
+      - gla
+      - annual_footfall
+      - mixed_use_area
+      - urban_catchment
+    discovery_queries:
+      - "{country} shopping mall official GLA annual footfall"
+      - "{country} largest shopping malls gross leasable area operator portfolio"
+      - "{country} mall GLA developer portfolio"
+    candidate_metric_queries:
+      - "{property_name} gross leasable area official"
+      - "{property_name} GLA operator portfolio"
+      - "{property_name} annual footfall official"
+    strengthening_queries:
+      - "{property_name} gross leasable area second source"
+      - "{property_name} developer portfolio GLA"
+      - "{property_name} MECSC directory gross leasable area"
+    preferred_channels:
+      - owner/operator official site
+      - developer portfolio
+      - leasing brochure
+      - official mall site
+    fallback_channels:
+      - MECSR or MECSC directory
+      - tourism/travel profile for identity only
+      - Tripadvisor only as tertiary proxy
+    proxy_handling:
+      total_development_area_indicator: mixed_use_area
+      direct_gla_requires_explicit_terms:
+        - gross leasable area
+        - GLA
+        - retail GLA
+    build_status_queries:
+      - "{property_name} mall indoor 5G coverage operator announcement"
+      - "{property_name} distributed antenna system mobile operator"
+
+  office_government:
+    scan_priority: 40
+    priority_band: primary_landmark
+    objective_indicators:
+      - office_nla
+      - office_gfa
+      - building_grade
+      - tenant_quality
+      - hq_density
+    discovery_queries:
+      - "{country} office tower official gross floor area headquarters"
+      - "{country} CBD office tower gross floor area developer"
+      - "{country} government complex building area official"
+    candidate_metric_queries:
+      - "{property_name} gross floor area official"
+      - "{property_name} net leasable area developer"
+      - "{property_name} headquarters tenant building area"
+    strengthening_queries:
+      - "{property_name} office GFA second source"
+      - "{property_name} CTBUH floor area"
+    preferred_channels:
+      - owner/developer
+      - REIT or portfolio page
+      - official government building project
+    fallback_channels:
+      - CTBUH
+      - architect pages
+      - contractor pages
+    build_status_queries:
+      - "{property_name} office indoor 5G coverage operator announcement"
+      - "{property_name} government office DAS indoor network mobile operator"
+
+  hospital:
+    scan_priority: 80
+    priority_band: supplemental
+    objective_indicators:
+      - beds
+      - outpatient_volume
+      - hospital_grade
+      - referral_role
+    discovery_queries:
+      - "{country} hospital official beds annual report"
+      - "{country} largest hospital bed capacity official"
+      - "{country} hospital beds operator profile contractor"
+    candidate_metric_queries:
+      - "{property_name} beds official"
+      - "{property_name} bed capacity operator profile"
+      - "{property_name} hospital project beds contractor"
+    strengthening_queries:
+      - "{property_name} beds second source"
+      - "{property_name} hospital official operator profile"
+    preferred_channels:
+      - hospital official site
+      - operator network
+      - ministry listing
+    fallback_channels:
+      - contractor/project page
+      - international hospital network profile
+      - recognized partner page
+    build_status_queries:
+      - "{property_name} hospital indoor 5G coverage operator announcement"
+      - "{property_name} distributed antenna system mobile operator"
+
+  university:
+    scan_priority: 90
+    priority_band: supplemental
+    objective_indicators:
+      - enrollment
+      - student_count
+      - campus_population
+      - campus_center_role
+    discovery_queries:
+      - "{country} university official enrollment students main campus"
+      - "{country} university enrollment factbook official"
+      - "{country} higher education enrolled students ministry statistics"
+    candidate_metric_queries:
+      - "{property_name} enrollment students official factbook"
+      - "{property_name} student enrollment annual report"
+      - "{property_name} enrollment ministry statistics"
+    strengthening_queries:
+      - "{property_name} official factbook enrollment"
+      - "{property_name} students second source"
+      - "{property_name} official campus profile"
+    preferred_channels:
+      - official factbook or quick facts
+      - ministry higher-education statistics
+      - national statistics portal
+      - university annual report
+    fallback_channels:
+      - official admissions/student pages for identity only
+      - public aggregators only as tertiary metric backup
+    build_status_queries:
+      - "{property_name} campus indoor 5G coverage operator announcement"
+      - "{property_name} university DAS indoor network mobile operator"
+
+  transport_hub:
+    scan_priority: 5
+    priority_band: primary_landmark
+    objective_indicators:
+      - daily_ridership
+      - interchange_volume
+      - line_count
+      - hub_role
+    discovery_queries:
+      - "{country} central station official daily ridership passengers"
+      - "{country} metro railway station daily ridership official"
+      - "{country} busiest station passenger traffic transport authority"
+    candidate_metric_queries:
+      - "{property_name} daily ridership official"
+      - "{property_name} passenger traffic transport authority"
+      - "{property_name} station ridership annual report"
+    strengthening_queries:
+      - "{property_name} ridership second source"
+      - "{property_name} line count interchange official"
+    preferred_channels:
+      - transport authority
+      - rail/metro operator
+      - ministry annual statistics
+    fallback_channels:
+      - project pages
+      - route maps
+      - OSM for coordinates only
+    build_status_queries:
+      - "{property_name} station indoor 5G coverage operator announcement"
+      - "{property_name} transport hub distributed antenna system mobile operator"
+
+  cruise_port:
+    scan_priority: 50
+    priority_band: secondary_landmark
+    objective_indicators:
+      - passenger_throughput
+      - terminal_role
+      - international_cruise_frequency
+    discovery_queries:
+      - "{country} cruise terminal official passenger throughput"
+      - "{country} cruise port passenger traffic annual report"
+      - "{country} port authority cruise passengers terminal official"
+    candidate_metric_queries:
+      - "{property_name} cruise passengers official"
+      - "{property_name} passenger throughput port authority"
+      - "{property_name} cruise terminal annual report"
+    strengthening_queries:
+      - "{property_name} cruise passenger traffic second source"
+      - "{property_name} port authority terminal role"
+    preferred_channels:
+      - port authority
+      - cruise terminal operator
+      - official annual report
+    fallback_channels:
+      - government tourism or port project pages
+      - public cruise directories for identity only
+    build_status_queries:
+      - "{property_name} cruise terminal indoor 5G coverage operator announcement"
+      - "{property_name} cruise port DAS indoor network mobile operator"

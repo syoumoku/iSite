@@ -1,0 +1,13 @@
+.git
+.venv
+.pytest_cache
+.ruff_cache
+.firecrawl
+.secrets
+.tmp
+outputs
+ui/world_map/node_modules
+ui/world_map/dist
+**/__pycache__
+*.pyc
+.DS_Store

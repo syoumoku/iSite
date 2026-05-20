@@ -1,0 +1,289 @@
+version: "0.1"
+source_types:
+  official_government:
+    label: "official/government"
+    priority: 10
+  operator_venue:
+    label: "operator/venue"
+    priority: 20
+  annual_report_pdf:
+    label: "annual_report/pdf"
+    priority: 30
+  firecrawl_search:
+    label: "firecrawl/search+scrape"
+    priority: 35
+  map_entity:
+    label: "map/entity"
+    priority: 40
+  operator_build_status:
+    label: "operator/build-status"
+    priority: 50
+  secondary_reference:
+    label: "secondary_reference"
+    priority: 60
+
+scenes:
+  airport_terminal:
+    scene_label: "airport terminal"
+    scan_priority: 0
+    priority_band: "primary_landmark"
+    preferred_indicators:
+      - annual_passenger_throughput
+      - passenger_throughput
+      - terminal_role
+    query_templates:
+      official_government:
+        - "{country} airport authority passenger traffic annual report"
+        - "{country} international airport passenger statistics official"
+      operator_venue:
+        - "{country} international airport official passengers terminal"
+      annual_report_pdf:
+        - "{country} airport annual report passengers filetype:pdf"
+      firecrawl_search:
+        - "{country} airport passenger traffic terminal official annual report"
+        - "{country} busiest airports passenger traffic CEIC"
+        - "{country} airport passenger statistics civil aviation authority"
+      map_entity:
+        - "{country} international airport coordinates"
+      operator_build_status:
+        - "{country} airport terminal indoor 5G coverage operator announcement"
+        - "{country} airport distributed antenna system mobile operator"
+      secondary_reference:
+        - "{country} busiest airport passenger traffic"
+  convention_center:
+    scene_label: "convention center"
+    scan_priority: 10
+    priority_band: "primary_landmark"
+    preferred_indicators:
+      - exhibition_area
+      - annual_events
+      - peak_event_capacity
+    query_templates:
+      official_government:
+        - "{country} convention centre official exhibition area"
+      operator_venue:
+        - "{country} convention center official capacity events"
+      annual_report_pdf:
+        - "{country} convention center annual report events filetype:pdf"
+      firecrawl_search:
+        - "{country} convention center official exhibition area capacity"
+        - "{country} exhibition center meeting space Cvent Northstar"
+        - "{country} international conference center venue capacity"
+      map_entity:
+        - "{country} convention center coordinates"
+      operator_build_status:
+        - "{country} convention center indoor 5G coverage operator announcement"
+        - "{country} convention centre DAS indoor network mobile operator"
+      secondary_reference:
+        - "{country} largest convention center exhibition area"
+  stadium:
+    scene_label: "stadium"
+    scan_priority: 30
+    priority_band: "primary_landmark"
+    preferred_indicators:
+      - seat_count
+      - event_days
+      - main_venue_role
+    query_templates:
+      official_government:
+        - "{country} national stadium capacity official"
+      operator_venue:
+        - "{country} stadium official capacity seats"
+      annual_report_pdf:
+        - "{country} stadium annual report capacity filetype:pdf"
+      firecrawl_search:
+        - "{country} national stadium official capacity seats"
+        - "{country} largest stadium capacity StadiumDB"
+        - "{country} football stadium capacity Transfermarkt"
+      map_entity:
+        - "{country} national stadium coordinates"
+      operator_build_status:
+        - "{country} stadium indoor 5G coverage operator announcement"
+        - "{country} stadium distributed antenna system mobile operator"
+      secondary_reference:
+        - "{country} largest stadium capacity seats"
+  luxury_hotel_mice:
+    scene_label: "hotel conference"
+    scan_priority: 20
+    priority_band: "primary_landmark"
+    preferred_indicators:
+      - keys
+      - rooms
+      - meeting_ballroom_area
+      - ballroom_capacity
+    query_templates:
+      official_government:
+        - "{country} tourism hotel conference rooms official"
+      operator_venue:
+        - "{country} hotel official rooms ballroom capacity"
+      annual_report_pdf:
+        - "{country} hotel annual report rooms ballroom filetype:pdf"
+      firecrawl_search:
+        - "{country} conference hotel official rooms ballroom capacity"
+        - "{country} luxury hotel meeting space ballroom capacity official"
+        - "{country} five star hotel rooms conference facilities"
+      map_entity:
+        - "{country} conference hotel coordinates"
+      operator_build_status:
+        - "{country} hotel indoor 5G coverage operator announcement"
+        - "{country} hotel DAS indoor mobile network"
+      secondary_reference:
+        - "{country} largest hotel rooms conference"
+  mall_mixed_use:
+    scene_label: "shopping mall"
+    scan_priority: 60
+    priority_band: "secondary_landmark"
+    preferred_indicators:
+      - gla
+      - annual_footfall
+      - urban_catchment
+    query_templates:
+      official_government:
+        - "{country} shopping mall official gross leasable area"
+      operator_venue:
+        - "{country} mall official GLA footfall"
+      annual_report_pdf:
+        - "{country} mall annual report footfall GLA filetype:pdf"
+      firecrawl_search:
+        - "{country} shopping mall official GLA annual footfall"
+        - "{country} largest shopping malls gross leasable area operator portfolio"
+        - "{country} mall GLA developer portfolio"
+      map_entity:
+        - "{country} shopping mall coordinates"
+      operator_build_status:
+        - "{country} shopping mall indoor 5G coverage operator announcement"
+        - "{country} mall distributed antenna system mobile operator"
+      secondary_reference:
+        - "{country} largest shopping mall gross leasable area"
+  office_government:
+    scene_label: "office tower government"
+    scan_priority: 40
+    priority_band: "primary_landmark"
+    preferred_indicators:
+      - office_gfa
+      - office_nla
+      - building_grade
+      - hq_density
+    query_templates:
+      official_government:
+        - "{country} government office complex official floor area"
+      operator_venue:
+        - "{country} office tower official gross floor area"
+      annual_report_pdf:
+        - "{country} office building annual report gross floor area filetype:pdf"
+      firecrawl_search:
+        - "{country} office tower official gross floor area headquarters"
+        - "{country} CBD office tower gross floor area developer"
+        - "{country} government complex building area official"
+      map_entity:
+        - "{country} office tower coordinates"
+      operator_build_status:
+        - "{country} office tower indoor 5G coverage operator announcement"
+        - "{country} government office DAS indoor network mobile operator"
+      secondary_reference:
+        - "{country} tallest office tower floor area"
+  hospital:
+    scene_label: "hospital"
+    scan_priority: 80
+    priority_band: "supplemental"
+    preferred_indicators:
+      - beds
+      - outpatient_volume
+      - hospital_grade
+    query_templates:
+      official_government:
+        - "{country} hospital official beds annual report"
+      operator_venue:
+        - "{country} hospital official bed capacity"
+      annual_report_pdf:
+        - "{country} hospital annual report beds filetype:pdf"
+      firecrawl_search:
+        - "{country} hospital official beds annual report"
+        - "{country} largest hospital bed capacity official"
+        - "{country} hospital beds operator profile contractor"
+      map_entity:
+        - "{country} hospital coordinates"
+      operator_build_status:
+        - "{country} hospital indoor 5G coverage operator announcement"
+        - "{country} hospital distributed antenna system mobile operator"
+      secondary_reference:
+        - "{country} largest hospital beds"
+  university:
+    scene_label: "university campus"
+    scan_priority: 90
+    priority_band: "supplemental"
+    preferred_indicators:
+      - enrollment
+      - students
+      - campus_center_role
+    query_templates:
+      official_government:
+        - "{country} university official enrollment students"
+      operator_venue:
+        - "{country} university campus official students"
+      annual_report_pdf:
+        - "{country} university annual report enrollment filetype:pdf"
+      firecrawl_search:
+        - "{country} university official enrollment students main campus"
+        - "{country} university enrollment factbook official"
+        - "{country} higher education enrolled students ministry statistics"
+      map_entity:
+        - "{country} university coordinates"
+      operator_build_status:
+        - "{country} university campus indoor 5G coverage operator announcement"
+        - "{country} university DAS indoor network mobile operator"
+      secondary_reference:
+        - "{country} largest university enrollment"
+  transport_hub:
+    scene_label: "transport hub"
+    scan_priority: 5
+    priority_band: "primary_landmark"
+    preferred_indicators:
+      - daily_ridership
+      - ridership
+      - line_count
+      - hub_role
+    query_templates:
+      official_government:
+        - "{country} central station official ridership passengers"
+      operator_venue:
+        - "{country} transport hub official daily ridership"
+      annual_report_pdf:
+        - "{country} railway metro annual report ridership station filetype:pdf"
+      firecrawl_search:
+        - "{country} central station official daily ridership passengers"
+        - "{country} metro railway station daily ridership official"
+        - "{country} busiest station passenger traffic transport authority"
+      map_entity:
+        - "{country} central station coordinates"
+      operator_build_status:
+        - "{country} central station indoor 5G coverage operator announcement"
+        - "{country} transport hub distributed antenna system mobile operator"
+      secondary_reference:
+        - "{country} busiest station ridership"
+  cruise_port:
+    scene_label: "cruise port"
+    scan_priority: 50
+    priority_band: "secondary_landmark"
+    preferred_indicators:
+      - passenger_throughput
+      - international_cruise_frequency
+      - terminal_role
+    query_templates:
+      official_government:
+        - "{country} cruise port official passenger throughput"
+      operator_venue:
+        - "{country} cruise terminal official passengers"
+      annual_report_pdf:
+        - "{country} port annual report cruise passengers filetype:pdf"
+      firecrawl_search:
+        - "{country} cruise terminal official passenger throughput"
+        - "{country} cruise port passenger traffic annual report"
+        - "{country} port authority cruise passengers terminal official"
+      map_entity:
+        - "{country} cruise terminal coordinates"
+      operator_build_status:
+        - "{country} cruise terminal indoor 5G coverage operator announcement"
+        - "{country} cruise port DAS indoor network mobile operator"
+      secondary_reference:
+        - "{country} cruise port passenger traffic"

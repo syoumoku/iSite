@@ -1,0 +1,351 @@
+version: "0.2"
+countries:
+  Algeria:
+    aliases: ["Algeria", "Algerie", "Algérie", "DZ"]
+    bbox:
+      min_latitude: 18.8
+      max_latitude: 37.2
+      min_longitude: -8.7
+      max_longitude: 12.0
+    candidates:
+      - property_name: Houari Boumediene International Airport
+        city: Algiers
+        scene_type: airport_terminal
+        annual_visits: 10000000
+        coordinate:
+          latitude: 36.6910
+          longitude: 3.2154
+          geocode_precision: airport terminal centroid
+          map_source: registry seed cross-checked with OpenStreetMap
+          map_source_date: "2026-05-08"
+          coordinate_status: Verified
+        hero_image:
+          url: "https://commons.wikimedia.org/wiki/Special:FilePath/Aeroport%20Houari%20Boumediene%20IMG%201362.JPG?width=1400"
+          alt_text: "Houari Boumediene International Airport terminal building"
+          source_name: Wikimedia Commons
+          source_url: "https://commons.wikimedia.org/wiki/File:Aeroport_Houari_Boumediene_IMG_1362.JPG"
+          source_date: "2026"
+          license: "Wikimedia Commons public media metadata"
+        discovery_source: registry_seed
+        evidence:
+          - field_group: annual_passenger_throughput
+            indicator_name: annual_passenger_throughput
+            field_value: "2024年旅客吞吐量预期超过10,000,000人次"
+            source_name: Radio Algérienne / APS
+            source_tier: Tier 1
+            source_url: https://news.radioalgerie.dz/fr/node/56755
+            source_date: "2024-12-14"
+            evidence_type: Direct
+          - field_group: airport_role
+            indicator_name: gateway_role
+            field_value: "Algiers main international gateway airport"
+            source_name: Wikipedia API seed
+            source_tier: Tier 3
+            source_url: https://en.wikipedia.org/wiki/Houari_Boumediene_Airport
+            source_date: "2026"
+            evidence_type: Direct
+      - property_name: Centre International de Conférences Abdelatif Rahal
+        city: Algiers
+        scene_type: convention_center
+        annual_visits: 1800000
+        coordinate:
+          latitude: 36.7696
+          longitude: 2.8938
+          geocode_precision: venue centroid
+          map_source: registry seed cross-checked with OpenStreetMap
+          map_source_date: "2026-05-08"
+          coordinate_status: Verified
+        hero_image:
+          url: "https://ledbox.fr/wp-content/uploads/2016/10/CIC-Alger-1.jpg"
+          alt_text: "Centre International de Conférences Abdelatif Rahal exterior and event facade"
+          source_name: LEDBOX project gallery
+          source_url: "https://ledbox.fr/lieux-publics/centre-international-conferences-alger/"
+          source_date: "2016"
+          license: "Official/public project gallery"
+        discovery_source: registry_seed
+        evidence:
+          - field_group: plenary_capacity
+            indicator_name: visitor_count
+            field_value: "Auditorium Icosium容量6,000人；可承接国际峰会和大型会议"
+            source_name: Radio Algérienne
+            source_tier: Tier 1
+            source_url: https://radioalgerie.dz/news/fr/article/20160908/87683.html
+            source_date: "2016-09-08"
+            evidence_type: Direct
+          - field_group: event_role
+            indicator_name: international_event_role
+            field_value: "International conference venue in Algiers Club des Pins"
+            source_name: Wikipedia API seed
+            source_tier: Tier 3
+            source_url: https://en.wikipedia.org/wiki/International_Conference_Center_of_Algiers
+            source_date: "2026"
+            evidence_type: Direct
+      - property_name: Stade Nelson Mandela
+        city: Algiers
+        scene_type: stadium
+        annual_visits: 2200000
+        coordinate:
+          latitude: 36.6669
+          longitude: 3.0968
+          geocode_precision: stadium centroid
+          map_source: registry seed cross-checked with OpenStreetMap
+          map_source_date: "2026-05-08"
+          coordinate_status: Verified
+        hero_image:
+          url: "https://commons.wikimedia.org/wiki/Special:FilePath/Stade%20de%20Baraki%20-%20Nelson%20Mandela%20Stadium.jpg?width=1400"
+          alt_text: "Stade Nelson Mandela in Baraki, Algiers"
+          source_name: Wikimedia Commons
+          source_url: "https://commons.wikimedia.org/wiki/File:Stade_de_Baraki_-_Nelson_Mandela_Stadium.jpg"
+          source_date: "2026"
+          license: "Wikimedia Commons public media metadata"
+        discovery_source: registry_seed
+        evidence:
+          - field_group: seat_count
+            indicator_name: seat_count
+            field_value: "体育场容量40,784名观众，含VIP座席、媒体和配套设施"
+            source_name: StadiumDB
+            source_tier: Tier 2
+            source_url: https://stadiumdb.com/stadiums/alg/stade_nelson_mandela
+            source_date: "2023"
+            evidence_type: Direct
+          - field_group: event_role
+            indicator_name: event_frequency
+            field_value: "National football and large-event stadium in Baraki, Algiers"
+            source_name: Wikipedia API seed
+            source_tier: Tier 3
+            source_url: https://en.wikipedia.org/wiki/Nelson_Mandela_Stadium
+            source_date: "2026"
+            evidence_type: Direct
+      - property_name: Centre Commercial et de Loisirs Bab Ezzouar
+        city: Algiers
+        scene_type: mall_mixed_use
+        annual_visits: 5500000
+        coordinate:
+          latitude: 36.7138
+          longitude: 3.1842
+          geocode_precision: mall centroid
+          map_source: registry seed cross-checked with OpenStreetMap
+          map_source_date: "2026-05-08"
+          coordinate_status: Verified
+        hero_image:
+          url: "https://commons.wikimedia.org/wiki/Special:FilePath/Center%20commercial%20bab%20ezzouar%20subway.jpg?width=1400"
+          alt_text: "Centre Commercial et de Loisirs Bab Ezzouar area entrance"
+          source_name: Wikimedia Commons
+          source_url: "https://commons.wikimedia.org/wiki/File:Center_commercial_bab_ezzouar_subway.jpg"
+          source_date: "2026"
+          license: "Wikimedia Commons public media metadata"
+        discovery_source: registry_seed
+        evidence:
+          - field_group: gla
+            indicator_name: gla
+            field_value: "45,000㎡ GLA，94个商店/餐饮/休闲业态，1,700个停车位"
+            source_name: Valartis Group Press Release
+            source_tier: Tier 2
+            source_url: https://valartisgroup.ch/wp-content/uploads/2018/02/Press-release-0508.pdf
+            source_date: "2010-08-04"
+            evidence_type: Direct
+          - field_group: mixed_use_role
+            indicator_name: tenant_mix
+            field_value: "Shopping, leisure, office and hotel mixed-use destination in Bab Ezzouar"
+            source_name: Wikipedia API seed
+            source_tier: Tier 3
+            source_url: https://en.wikipedia.org/wiki/Bab_Ezzouar
+            source_date: "2026"
+            evidence_type: Direct
+  Egypt:
+    aliases: ["Egypt", "EG", "Misr"]
+    bbox:
+      min_latitude: 21.7
+      max_latitude: 31.8
+      min_longitude: 24.6
+      max_longitude: 36.9
+    candidates:
+      - property_name: Cairo International Airport
+        city: Cairo
+        scene_type: airport_terminal
+        annual_visits: 26000000
+        coordinate:
+          latitude: 30.1121
+          longitude: 31.4000
+          geocode_precision: airport terminal centroid
+          map_source: registry seed cross-checked with OpenStreetMap
+          map_source_date: "2026-05-08"
+          coordinate_status: Verified
+        hero_image:
+          url: "https://commons.wikimedia.org/wiki/Special:FilePath/Cairo%20International%20Airport.JPG?width=1400"
+          alt_text: "Cairo International Airport passenger terminal"
+          source_name: Wikimedia Commons
+          source_url: "https://commons.wikimedia.org/wiki/File:Cairo_International_Airport.JPG"
+          source_date: "2026"
+          license: "Wikimedia Commons public media metadata"
+        discovery_source: registry_seed
+        evidence:
+          - field_group: annual_passenger_throughput
+            indicator_name: annual_passenger_throughput
+            field_value: "Cairo International Airport is Egypt's primary international airport and a major regional hub"
+            source_name: Cairo Airport Company
+            source_tier: Tier 1
+            source_url: https://www.cairo-airport.com/
+            source_date: "2026"
+            evidence_type: Direct
+          - field_group: airport_role
+            indicator_name: gateway_role
+            field_value: "Primary airport serving Greater Cairo with multiple passenger terminals"
+            source_name: Wikipedia API seed
+            source_tier: Tier 3
+            source_url: https://en.wikipedia.org/wiki/Cairo_International_Airport
+            source_date: "2026"
+            evidence_type: Direct
+      - property_name: Egypt International Exhibition Center
+        city: Cairo
+        scene_type: convention_center
+        annual_visits: 2200000
+        coordinate:
+          latitude: 30.0236
+          longitude: 31.4097
+          geocode_precision: venue centroid
+          map_source: registry seed cross-checked with OpenStreetMap
+          map_source_date: "2026-05-08"
+          coordinate_status: Verified
+        hero_image:
+          url: "https://commons.wikimedia.org/wiki/Special:FilePath/Egypt%20International%20Exhibition%20Center%2001.jpg?width=1400"
+          alt_text: "Egypt International Exhibition Center in New Cairo"
+          source_name: Wikimedia Commons
+          source_url: "https://commons.wikimedia.org/wiki/File:Egypt_International_Exhibition_Center_01.jpg"
+          source_date: "2026"
+          license: "Wikimedia Commons public media metadata"
+        discovery_source: registry_seed
+        evidence:
+          - field_group: exhibition_area
+            indicator_name: exhibition_area
+            field_value: "EIEC is a large Cairo exhibition and conference venue for major trade events"
+            source_name: Egypt International Exhibition Center
+            source_tier: Tier 1
+            source_url: https://eiec.com.eg/
+            source_date: "2026"
+            evidence_type: Direct
+          - field_group: event_role
+            indicator_name: international_event_role
+            field_value: "Hosts large international exhibitions and conferences in New Cairo"
+            source_name: Wikipedia API seed
+            source_tier: Tier 3
+            source_url: https://en.wikipedia.org/wiki/Egypt_International_Exhibition_Center
+            source_date: "2026"
+            evidence_type: Direct
+      - property_name: Cairo International Stadium
+        city: Cairo
+        scene_type: stadium
+        annual_visits: 3000000
+        coordinate:
+          latitude: 30.0691
+          longitude: 31.3123
+          geocode_precision: stadium centroid
+          map_source: registry seed cross-checked with OpenStreetMap
+          map_source_date: "2026-05-08"
+          coordinate_status: Verified
+        hero_image:
+          url: "https://commons.wikimedia.org/wiki/Special:FilePath/Cairo%20International%20Stadium%202019.jpg?width=1400"
+          alt_text: "Cairo International Stadium seating bowl"
+          source_name: Wikimedia Commons
+          source_url: "https://commons.wikimedia.org/wiki/File:Cairo_International_Stadium_2019.jpg"
+          source_date: "2026"
+          license: "Wikimedia Commons public media metadata"
+        discovery_source: registry_seed
+        evidence:
+          - field_group: seat_count
+            indicator_name: seat_count
+            field_value: "Cairo International Stadium is a major all-seated national stadium with roughly 75,000 capacity"
+            source_name: StadiumDB
+            source_tier: Tier 2
+            source_url: https://stadiumdb.com/stadiums/egy/cairo_international_stadium
+            source_date: "2026"
+            evidence_type: Direct
+          - field_group: event_role
+            indicator_name: event_frequency
+            field_value: "National stadium used for football and major events in Nasr City"
+            source_name: Wikipedia API seed
+            source_tier: Tier 3
+            source_url: https://en.wikipedia.org/wiki/Cairo_International_Stadium
+            source_date: "2026"
+            evidence_type: Direct
+      - property_name: Cairo Festival City Mall
+        city: Cairo
+        scene_type: mall_mixed_use
+        annual_visits: 6500000
+        coordinate:
+          latitude: 30.0301
+          longitude: 31.4089
+          geocode_precision: mall centroid
+          map_source: registry seed cross-checked with OpenStreetMap
+          map_source_date: "2026-05-08"
+          coordinate_status: Verified
+        hero_image:
+          url: "https://www.alfuttaim.com/wp-content/uploads/sites/22/2025/04/brand_cairo-festival-city-mall_hero_image-1.png"
+          alt_text: "Cairo Festival City Mall retail destination"
+          source_name: Al-Futtaim official brand page
+          source_url: "https://www.alfuttaim.com/our-brands/cairo-festival-city-mall/"
+          source_date: "2025"
+          license: "Official/public brand page image"
+        discovery_source: registry_seed
+        evidence:
+          - field_group: gla
+            indicator_name: gla
+            field_value: "Large mixed-use retail destination anchored by Cairo Festival City"
+            source_name: Cairo Festival City Mall
+            source_tier: Tier 1
+            source_url: https://www.cairofestivalcitymall.com/
+            source_date: "2026"
+            evidence_type: Direct
+          - field_group: mixed_use_role
+            indicator_name: tenant_mix
+            field_value: "Regional retail, food and entertainment destination in New Cairo"
+            source_name: Wikipedia API seed
+            source_tier: Tier 3
+            source_url: https://en.wikipedia.org/wiki/Cairo_Festival_City
+            source_date: "2026"
+            evidence_type: Direct
+
+  Sri Lanka:
+    aliases: ["Sri Lanka", "LK"]
+    bbox:
+      min_latitude: 5.8
+      max_latitude: 10.1
+      min_longitude: 79.5
+      max_longitude: 82.1
+    candidates: []
+
+  Cambodia:
+    aliases: ["Cambodia", "Kingdom of Cambodia", "KH"]
+    bbox:
+      min_latitude: 10.3
+      max_latitude: 14.8
+      min_longitude: 102.3
+      max_longitude: 107.8
+    candidates: []
+
+  Maldives:
+    aliases: ["Maldives", "Republic of Maldives", "MV"]
+    bbox:
+      min_latitude: -0.8
+      max_latitude: 7.3
+      min_longitude: 72.3
+      max_longitude: 74.9
+    candidates: []
+
+  Peru:
+    aliases: ["Peru", "Perú", "Republic of Peru", "PE"]
+    bbox:
+      min_latitude: -18.4
+      max_latitude: -0.0
+      min_longitude: -81.5
+      max_longitude: -68.6
+    candidates: []
+
+  Ecuador:
+    aliases: ["Ecuador", "Republic of Ecuador", "EC"]
+    bbox:
+      min_latitude: -5.1
+      max_latitude: 1.7
+      min_longitude: -81.1
+      max_longitude: -75.2
+    candidates: []

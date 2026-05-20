@@ -1,0 +1,42 @@
+version: "0.1"
+gates:
+  entity_gate:
+    required:
+      - country
+      - city
+      - property_name
+      - scene_type
+      - latitude
+      - longitude
+      - geocode_precision
+  evidence_gate:
+    rule: "At least one Tier 1/Tier 2 source or two independent Tier 3 sources, plus one core scene indicator or strong proxy."
+  scene_modeling_gate:
+    required:
+      - proxy_basis
+      - proxy_level
+      - area_metric_name
+      - area_metric_status
+  build_status_gate:
+    required:
+      - indoor_system_presence
+      - indoor_system_type
+      - indoor_rat
+      - build_evidence_status
+    note: "Unknown is allowed; blank is not."
+  demand_gate:
+    rule: "If annual_visits or scene proxy is available, calculate formula chain; otherwise write reason."
+  conclusion_gate:
+    required:
+      - evidence_status
+      - value_class
+      - action_class
+      - recommended_solution
+      - reason_to_recommend
+      - next_action
+  candidate_quality_gate:
+    rule: "Block placeholder names, city/country-only names, generic topic pages, non-property geocodes, and entity/evidence mismatches from map/export/main-table visibility."
+    blocking_surfaces:
+      - main_table
+      - map
+      - export

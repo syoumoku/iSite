@@ -1,0 +1,255 @@
+openapi: 3.1.0
+info:
+  title: iSite2 API
+  version: 0.1.0
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200': { description: OK }
+  /scan-runs:
+    post:
+      summary: Create a scan run
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [scope]
+              properties:
+                scope:
+                  type: object
+      responses:
+        '201': { description: Created }
+    get:
+      summary: List scan runs
+      responses:
+        '200': { description: OK }
+  /scan-runs/{run_id}:
+    get:
+      summary: Get scan run status
+      parameters:
+        - in: path
+          name: run_id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+  /properties:
+    get:
+      summary: List properties with filters
+      description: Defaults to the database-wide latest packet per canonical property. Passing scan_run_id narrows the result to one historical scan run.
+      parameters:
+        - in: query
+          name: scan_run_id
+          description: Optional historical scan-run scope. Omit for the full candidate property pool.
+          schema: { type: string }
+        - in: query
+          name: country
+          schema: { type: string }
+        - in: query
+          name: city
+          schema: { type: string }
+        - in: query
+          name: scene_type
+          schema: { type: string }
+        - in: query
+          name: evidence_status
+          schema: { type: string }
+        - in: query
+          name: value_class
+          schema: { type: string }
+        - in: query
+          name: action_class
+          schema: { type: string }
+        - in: query
+          name: recommended_solution
+          schema: { type: string }
+        - in: query
+          name: indoor_system_presence
+          schema: { type: string }
+        - in: query
+          name: indoor_rat
+          schema: { type: string }
+        - in: query
+          name: proxy_level
+          schema: { type: string }
+        - in: query
+          name: has_review_issue
+          schema: { type: boolean }
+        - in: query
+          name: top_n
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '200': { description: OK }
+  /properties/{property_id}:
+    get:
+      summary: Get property detail with evidence, inference, demand, conclusion, review items
+      parameters:
+        - in: path
+          name: property_id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+  /map/properties:
+    get:
+      summary: Get property GeoJSON for world map
+      description: Defaults to distinct map-ready properties across the full database, using each property's latest packet. Passing scan_run_id is optional and intended for single-run debugging.
+      parameters:
+        - in: query
+          name: scan_run_id
+          description: Optional historical scan-run scope. Omit for the full candidate property pool.
+          schema: { type: string }
+        - in: query
+          name: country
+          schema: { type: string }
+        - in: query
+          name: scene_type
+          schema: { type: string }
+        - in: query
+          name: evidence_status
+          schema: { type: string }
+        - in: query
+          name: value_class
+          schema: { type: string }
+        - in: query
+          name: action_class
+          schema: { type: string }
+        - in: query
+          name: indoor_system_presence
+          schema: { type: string }
+        - in: query
+          name: indoor_rat
+          schema: { type: string }
+        - in: query
+          name: proxy_level
+          schema: { type: string }
+        - in: query
+          name: has_review_issue
+          schema: { type: boolean }
+      responses:
+        '200': { description: GeoJSON FeatureCollection }
+  /map/country-summary:
+    get:
+      summary: Get country-level candidate summary
+      description: Defaults to country counts across the full candidate property pool, not the latest scan run.
+      parameters:
+        - in: query
+          name: scan_run_id
+          description: Optional historical scan-run scope. Omit for the full candidate property pool.
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+  /review-queue:
+    get:
+      summary: List review items
+      parameters:
+        - in: query
+          name: scan_run_id
+          schema: { type: string }
+        - in: query
+          name: country
+          schema: { type: string }
+        - in: query
+          name: city
+          schema: { type: string }
+        - in: query
+          name: scene_type
+          schema: { type: string }
+        - in: query
+          name: evidence_status
+          schema: { type: string }
+        - in: query
+          name: value_class
+          schema: { type: string }
+        - in: query
+          name: action_class
+          schema: { type: string }
+        - in: query
+          name: indoor_system_presence
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+  /rag/index:
+    post:
+      summary: Incrementally index evidence and property packets for RAG
+      description: Indexes source cache, raw evidence, and property packets. Optional filters narrow by scan run, property, or country.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                scan_run_id: { type: string, format: uuid }
+                property_id: { type: string, format: uuid }
+                country: { type: string }
+      responses:
+        '202': { description: Accepted }
+  /rag/query:
+    post:
+      summary: Ask iSite2 evidence-backed RAG
+      description: Returns answer, citations, priority recommendations, and review actions. Strong conclusions require cited evidence.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [question]
+              properties:
+                question: { type: string }
+                scan_run_id: { type: string, format: uuid }
+                property_id: { type: string, format: uuid }
+                country: { type: string }
+                scene_type: { type: string }
+                top_k: { type: integer, minimum: 1, default: 5 }
+      responses:
+        '200': { description: OK }
+  /outputs/excel:
+    post:
+      summary: Generate Excel artifact
+      description: Omit scan_run_id to export the current database-wide latest candidate pool; include filters to export the current UI slice.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: &OutputRequest
+              type: object
+              properties:
+                scan_run_id: { type: string, format: uuid }
+                country: { type: string }
+                city: { type: string }
+                scene_type: { type: string }
+                evidence_status: { type: string }
+                value_class: { type: string }
+                action_class: { type: string }
+                recommended_solution: { type: string }
+                indoor_system_presence: { type: string }
+                indoor_rat: { type: string }
+                proxy_level: { type: string }
+                has_review_issue: { type: boolean }
+      responses:
+        '202': { description: Accepted }
+  /outputs/ppt:
+    post:
+      summary: Generate PPT insight cards
+      description: Omit scan_run_id to export the current database-wide latest candidate pool; include filters to export the current UI slice.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: *OutputRequest
+      responses:
+        '202': { description: Accepted }
+  /rules/scenes:
+    get:
+      summary: List scene model rules
+      responses:
+        '200': { description: OK }

@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PropertyGeoJSONFeature",
+  "type": "object",
+  "required": [
+    "type",
+    "geometry",
+    "properties"
+  ],
+  "properties": {
+    "type": {
+      "const": "Feature"
+    },
+    "geometry": {
+      "type": "object",
+      "required": [
+        "type",
+        "coordinates"
+      ],
+      "properties": {
+        "type": {
+          "const": "Point"
+        },
+        "coordinates": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "properties": {
+      "type": "object",
+      "required": [
+        "property_id",
+        "property_name",
+        "country",
+        "city",
+        "scene_type",
+        "evidence_status",
+        "value_class",
+        "action_class"
+      ],
+      "properties": {
+        "property_id": {
+          "type": "string"
+        },
+        "property_name": {
+          "type": "string"
+        },
+        "country": {
+          "type": "string"
+        },
+        "city": {
+          "type": "string"
+        },
+        "scene_type": {
+          "type": "string"
+        },
+        "evidence_status": {
+          "type": "string"
+        },
+        "value_class": {
+          "type": "string"
+        },
+        "action_class": {
+          "type": "string"
+        },
+        "recommended_solution": {
+          "type": "string"
+        },
+        "main_metric_text": {
+          "type": "string"
+        },
+        "review_count": {
+          "type": "integer"
+        },
+        "source_count": {
+          "type": "integer"
+        },
+        "geocode_precision": {
+          "type": "string"
+        },
+        "map_source": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "coordinate_status": {
+          "type": "string"
+        },
+        "candidate_quality_status": {
+          "enum": [
+            "ready",
+            "review_required",
+            "blocked_quality"
+          ]
+        },
+        "visibility": {
+          "type": "object",
+          "properties": {
+            "raw_pool": {
+              "type": "boolean"
+            },
+            "review_required": {
+              "type": "boolean"
+            },
+            "main_table_ready": {
+              "type": "boolean"
+            },
+            "map_ready": {
+              "type": "boolean"
+            },
+            "export_ready": {
+              "type": "boolean"
+            }
+          }
+        },
+        "quality_issues": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,57 @@
+version: "0.1"
+agents:
+  - key: scope
+    name: Scope Agent
+    input: user_request
+    output: scan_scope
+    responsibility: Define boundary, countries, cities, full_scan, filters, output formats.
+  - key: discovery
+    name: Discovery Agent
+    input: scan_scope
+    output: property_candidates
+    responsibility: Build full candidate pool by scene, no Top-N truncation.
+  - key: entity
+    name: Entity Agent
+    input: property_candidate
+    output: normalized_property
+    responsibility: Normalize identity, lat/lon, map link, geocode precision.
+  - key: evidence
+    name: Evidence Agent
+    input: normalized_property
+    output: evidence_items
+    responsibility: Collect field-level evidence with source tier, date, cross-check status.
+  - key: scene_modeling
+    name: Scene Modeling Agent
+    input: normalized_property,evidence_items
+    output: scene_model_result
+    responsibility: Apply scene metrics, proxy basis, proxy level, metric availability.
+  - key: build_status
+    name: Build Status Agent
+    input: normalized_property,evidence_items
+    output: build_status
+    responsibility: Judge indoor system presence, type, RAT separately.
+  - key: demand
+    name: Demand Agent
+    input: scene_model_result
+    output: demand_estimate
+    responsibility: Calculate demand formula chain.
+  - key: inference
+    name: Inference Agent
+    input: missing_fields,evidence_items,scene_model_result,build_status
+    output: inference_records
+    responsibility: Conservative inference with trace.
+  - key: conclusion
+    name: Conclusion Agent
+    input: normalized_property,evidence_items,scene_model_result,build_status,demand_estimate,inference_records
+    output: conclusion
+    responsibility: Evidence Status, Value Class, Action Class, Recommended Solution.
+  - key: output
+    name: Output Agent
+    input: scan_run_results
+    output: artifacts
+    responsibility: Excel, PPT, Markdown, GeoJSON outputs.
+  - key: qa
+    name: QA Agent
+    input: all_outputs
+    output: review_queue,qa_report
+    responsibility: Validate gates, field completeness, inference, output consistency.

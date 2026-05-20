@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RagQueryRequest",
+  "type": "object",
+  "required": ["question"],
+  "properties": {
+    "question": { "type": "string", "minLength": 1 },
+    "scan_run_id": { "type": ["string", "null"], "format": "uuid" },
+    "property_id": { "type": ["string", "null"], "format": "uuid" },
+    "country": { "type": ["string", "null"] },
+    "scene_type": { "type": ["string", "null"] },
+    "top_k": { "type": "integer", "minimum": 1, "default": 5 }
+  },
+  "additionalProperties": false
+}

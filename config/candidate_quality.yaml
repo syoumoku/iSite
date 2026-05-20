@@ -1,0 +1,355 @@
+version: "0.1"
+status:
+  ready: ready
+  review_required: review_required
+  blocked: blocked_quality
+placeholder_tokens:
+  - mvp candidate
+  - mvp fake
+  - fixture
+  - fake centroid
+  - registry seed
+  - example city
+  - exampleland
+default_value_tokens:
+  - mvp fake
+  - fixture
+  - placeholder
+  - fake centroid
+  - fallback
+  - default
+  - deterministic proxy
+  - registry seed
+  - source_registry
+  - unknown
+objective_evidence_blocked_tokens:
+  - proxy
+  - estimate
+  - estimated
+  - assumption
+  - assumed
+  - verify official
+  - verify before direct
+  - not direct fact
+  - conservative baseline
+  - conservative estimate
+generic_topic_names:
+  - health care
+  - healthcare
+  - airline
+  - airlines
+known_location_only_names:
+  - abidjan
+  - bangui
+  - beijing
+  - benin
+  - buenos aires
+  - equatorial guinea
+  - ghana
+  - hong kong
+  - libreville
+  - los angeles
+  - mayotte
+  - nairobi
+  - panama city
+country_restricted_city_names:
+  São Paulo:
+    - Brazil
+  Sao Paulo:
+    - Brazil
+  São Paulo Metropolitan Region:
+    - Brazil
+  Central Zone of São Paulo:
+    - Brazil
+  Rio de Janeiro:
+    - Brazil
+blocked_city_level_tokens:
+  - province
+  - state
+  - region
+  - district
+  - governorate
+  - county
+  - municipality
+  - municipal
+  - commune
+  - prefecture
+  - department
+  - borough
+  - zone
+  - oblast
+  - vilayet
+  - wilaya
+  - metropolitan area
+  - local municipality
+  - partido
+  - atoll
+blocked_city_exact_values:
+  default:
+    - republic of maldives
+  Argentina:
+    - Rosario Department
+    - Chubut
+    - Chubut Province
+    - Mendoza Province
+    - San Juan Province
+  Brazil:
+    - Pernambuco
+  Chile:
+    - La Cisterna
+    - La Florida
+    - Lo Prado
+    - Ñuñoa
+    - Nunoa
+    - Providencia
+    - Pudahuel
+  Ghana:
+    - Amansie West
+    - Ashanti
+    - Ayawaso West
+    - Denkyembour
+    - Greater Accra
+  Maldives:
+    - Baa Atoll
+    - Gaafu Alifu
+    - South Ari Atoll
+    - South Male Atoll
+  Mexico:
+    - Baja California Sur
+    - Benito Juárez
+    - Benito Juarez
+    - Colonia Doctores
+    - Colonia Roma
+    - Cuauhtémoc
+    - Cuauhtemoc
+    - Gustavo A. Madero
+    - Miguel Hidalgo
+    - Monterrey metropolitan area
+    - Venustiano Carranza
+    - Yucatán
+    - Yucatan
+  South Africa:
+    - Eastern Cape
+    - Gauteng
+  Turkey:
+    - Altındağ
+    - Altindag
+    - Arnavutköy
+    - Arnavutkoy
+    - Başakşehir
+    - Basaksehir
+    - Beşiktaş
+    - Besiktas
+    - Kadıköy
+    - Kadikoy
+    - Konak
+    - Mecidiyeköy
+    - Mecidiyekoy
+    - Muratpaşa
+    - Muratpasa
+    - Pendik
+    - Sarıyer
+    - Sariyer
+    - Vişnezade
+    - Visnezade
+blocked_city_regexes:
+  - "^q[0-9]+$"
+blocked_geocode_precision_tokens:
+  - administrative
+  - city
+  - country
+  - gift
+  - municipality
+  - province
+  - restaurant
+  - state
+  - suburb
+  - town
+  - village
+scene_title_tokens:
+  airport_terminal:
+    - airport
+    - terminal
+    - aerodrome
+  convention_center:
+    - convention
+    - conference
+    - congress
+    - exhibition
+    - expo
+    - fair
+    - center
+    - centre
+  stadium:
+    - stadium
+    - arena
+    - sports centre
+    - sports center
+  luxury_hotel_mice:
+    - hotel
+    - resort
+    - convention
+    - conference
+  mall_mixed_use:
+    - mall
+    - shopping
+    - commercial
+    - centre
+    - center
+    - plaza
+  office_government:
+    - office
+    - tower
+    - headquarters
+    - ministry
+    - government
+  hospital:
+    - hospital
+    - medical
+    - clinic
+    - health centre
+    - health center
+  university:
+    - university
+    - college
+    - campus
+    - institute
+  transport_hub:
+    - station
+    - terminal
+    - interchange
+    - hub
+    - metro
+    - railway
+    - airport
+    - port
+  cruise_port:
+    - port
+    - cruise
+    - terminal
+allowed_geocode_precision_tokens:
+  airport_terminal:
+    - airport
+    - aerodrome
+    - terminal
+    - venue centroid
+  convention_center:
+    - convention
+    - conference
+    - exhibition
+    - venue
+    - building
+    - centre
+    - center
+  stadium:
+    - stadium
+    - arena
+    - pitch
+    - venue
+  luxury_hotel_mice:
+    - hotel
+    - resort
+    - venue
+    - building
+  mall_mixed_use:
+    - mall
+    - retail
+    - shopping
+    - commercial
+    - venue
+    - building
+  office_government:
+    - office
+    - tower
+    - government
+    - building
+    - venue
+  hospital:
+    - hospital
+    - clinic
+    - medical
+    - campus
+    - venue
+  university:
+    - university
+    - college
+    - campus
+    - school
+    - venue
+  transport_hub:
+    - station
+    - terminal
+    - interchange
+    - hub
+    - metro
+    - railway
+    - train
+    - transit
+    - airport
+    - port
+  cruise_port:
+    - port
+    - cruise
+    - terminal
+objective_indicator_aliases:
+  airport_terminal:
+    - annual_passenger_throughput
+    - passenger_throughput
+    - terminal_capacity
+    - international_passenger_share
+    - annual_visits
+  convention_center:
+    - exhibition_area
+    - meeting_area
+    - plenary_capacity
+    - annual_events
+    - peak_event_capacity
+    - annual_visits
+  stadium:
+    - seat_count
+    - event_days
+    - peak_event_capacity
+  luxury_hotel_mice:
+    - keys
+    - room_count
+    - meeting_ballroom_area
+    - ballroom_capacity
+  mall_mixed_use:
+    - gla
+    - retail_gfa
+    - mixed_use_area
+    - annual_footfall
+    - annual_visits
+    - footfall
+    - flagship_position
+    - anchor_brands
+    - urban_catchment
+  office_government:
+    - office_nla
+    - office_gfa
+    - building_grade
+    - tenant_quality
+    - hq_density
+    - cbd_role
+    - floor_count
+    - tower_height
+    - site_area
+  hospital:
+    - beds
+    - outpatient_volume
+    - hospital_grade
+  university:
+    - enrollment
+    - student_count
+    - campus_population
+  transport_hub:
+    - daily_ridership
+    - interchange_volume
+    - line_count
+  cruise_port:
+    - passenger_throughput
+    - annual_passenger_throughput
+blocking_surfaces:
+  - main_table
+  - map
+  - export

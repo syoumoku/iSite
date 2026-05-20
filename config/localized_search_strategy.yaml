@@ -1,0 +1,329 @@
+version: "0.1"
+purpose: "Build localized, low-cost evidence queries before escalating to Firecrawl."
+
+defaults:
+  search_limit: 5
+  firecrawl_gap_limit: 2
+  scrape: false
+  firecrawl_mode: "last_resort"
+  query_joiner: " OR "
+
+phases:
+  structured_source_discovery:
+    description: "Search free structured APIs, public CSVs, and official catalog indexes first."
+    use_firecrawl: false
+  official_catalog_discovery:
+    description: "Search official country/city/operator portals and public report catalogs."
+    use_firecrawl: false
+  metric_extraction:
+    description: "Use localized metric terms to find first-level quantitative scene evidence."
+    use_firecrawl: false
+  firecrawl_gap_fill:
+    description: "Escalate only after structured and official-source passes fail."
+    use_firecrawl: true
+
+country_profiles:
+  default:
+    languages: ["en"]
+    official_source_terms:
+      - "official"
+      - "annual report"
+      - "statistics"
+      - "fact sheet"
+    preferred_domains: []
+  Algeria:
+    languages: ["fr", "ar", "en"]
+    official_source_terms: ["statistiques", "rapport annuel", "ministère", "ديوان", "إحصائيات"]
+    preferred_domains: [".dz"]
+  Argentina:
+    languages: ["es", "en"]
+    official_source_terms: ["estadísticas", "memoria anual", "informe oficial", "gobierno"]
+    preferred_domains: [".gob.ar", ".gov.ar", ".ar"]
+  Bahamas:
+    languages: ["en"]
+    official_source_terms: ["official", "annual report", "statistics", "authority"]
+    preferred_domains: [".bs", ".gov.bs"]
+  Barbados:
+    languages: ["en"]
+    official_source_terms: ["official", "annual report", "statistics", "authority"]
+    preferred_domains: [".bb", ".gov.bb"]
+  Benin:
+    languages: ["fr", "en"]
+    official_source_terms: ["statistiques", "rapport annuel", "ministère", "officiel"]
+    preferred_domains: [".bj", ".gouv.bj"]
+  Bolivia:
+    languages: ["es", "en"]
+    official_source_terms: ["estadísticas", "informe anual", "oficial", "gobierno"]
+    preferred_domains: [".gob.bo", ".bo"]
+  Botswana:
+    languages: ["en"]
+    official_source_terms: ["official", "annual report", "statistics", "authority"]
+    preferred_domains: [".bw", ".gov.bw"]
+  Brazil:
+    languages: ["pt", "en"]
+    official_source_terms: ["estatísticas", "relatório anual", "anuário", "oficial", "site:gov.br"]
+    preferred_domains: [".gov.br", ".br"]
+  Cambodia:
+    languages: ["km", "en"]
+    official_source_terms: ["official", "statistics", "annual report", "ក្រសួង", "របាយការណ៍"]
+    preferred_domains: [".kh", ".gov.kh"]
+  Burkina Faso:
+    languages: ["fr", "en"]
+    official_source_terms: ["statistiques", "rapport annuel", "ministère", "officiel"]
+    preferred_domains: [".bf", ".gov.bf"]
+  Cameroon:
+    languages: ["fr", "en"]
+    official_source_terms: ["statistiques", "rapport annuel", "ministère", "official"]
+    preferred_domains: [".cm", ".gov.cm"]
+  Central African Republic:
+    languages: ["fr", "en"]
+    official_source_terms: ["statistiques", "rapport annuel", "ministère", "officiel"]
+    preferred_domains: [".cf"]
+  Chile:
+    languages: ["es", "en"]
+    official_source_terms: ["estadísticas", "memoria anual", "informe oficial", "gobierno"]
+    preferred_domains: [".gob.cl", ".cl"]
+  Colombia:
+    languages: ["es", "en"]
+    official_source_terms: ["estadísticas", "informe de gestión", "oficial", "gobierno"]
+    preferred_domains: [".gov.co", ".com.co", ".co"]
+  Ecuador:
+    languages: ["es", "en"]
+    official_source_terms: ["estadísticas", "informe anual", "oficial", "gobierno"]
+    preferred_domains: [".gob.ec", ".gov.ec", ".ec"]
+  Comoros:
+    languages: ["fr", "ar", "en"]
+    official_source_terms: ["statistiques", "rapport annuel", "ministère", "إحصائيات"]
+    preferred_domains: [".km"]
+  Cote d'Ivoire:
+    languages: ["fr", "en"]
+    official_source_terms: ["statistiques", "rapport annuel", "ministère", "officiel"]
+    preferred_domains: [".ci", ".gouv.ci"]
+  Djibouti:
+    languages: ["fr", "ar", "en"]
+    official_source_terms: ["statistiques", "rapport annuel", "ministère", "إحصائيات"]
+    preferred_domains: [".dj"]
+  Egypt:
+    languages: ["ar", "en"]
+    official_source_terms: ["إحصائيات", "تقرير سنوي", "رسمي", "وزارة", "annual report"]
+    preferred_domains: [".eg", ".gov.eg"]
+  Gabon:
+    languages: ["fr", "en"]
+    official_source_terms: ["statistiques", "rapport annuel", "ministère", "officiel"]
+    preferred_domains: [".ga", ".gouv.ga"]
+  Ghana:
+    languages: ["en"]
+    official_source_terms: ["official", "annual report", "statistics", "authority"]
+    preferred_domains: [".gh", ".gov.gh"]
+  Kenya:
+    languages: ["en"]
+    official_source_terms: ["official", "annual report", "statistics", "authority"]
+    preferred_domains: [".ke", ".go.ke"]
+  Liberia:
+    languages: ["en"]
+    official_source_terms: ["official", "annual report", "statistics", "authority"]
+    preferred_domains: [".lr", ".gov.lr"]
+  Libya:
+    languages: ["ar", "en"]
+    official_source_terms: ["إحصائيات", "تقرير سنوي", "رسمي", "وزارة", "annual report"]
+    preferred_domains: [".ly", ".gov.ly"]
+  Malawi:
+    languages: ["en"]
+    official_source_terms: ["official", "annual report", "statistics", "authority"]
+    preferred_domains: [".mw", ".gov.mw"]
+  Maldives:
+    languages: ["en", "dv"]
+    official_source_terms: ["official", "annual report", "statistics", "authority", "ރިޕޯޓް"]
+    preferred_domains: [".mv", ".gov.mv"]
+  Mauritius:
+    languages: ["en", "fr"]
+    official_source_terms: ["official", "statistics", "annual report", "rapport annuel"]
+    preferred_domains: [".mu", ".govmu.org"]
+  Mexico:
+    languages: ["es", "en"]
+    official_source_terms: ["estadísticas", "informe anual", "oficial", "gobierno"]
+    preferred_domains: [".gob.mx", ".mx"]
+  Morocco:
+    languages: ["fr", "ar", "en"]
+    official_source_terms: ["statistiques", "rapport annuel", "ministère", "إحصائيات"]
+    preferred_domains: [".ma", ".gov.ma"]
+  Mozambique:
+    languages: ["pt", "en"]
+    official_source_terms: ["estatísticas", "relatório anual", "oficial", "governo"]
+    preferred_domains: [".mz", ".gov.mz"]
+  Namibia:
+    languages: ["en"]
+    official_source_terms: ["official", "annual report", "statistics", "authority"]
+    preferred_domains: [".na", ".gov.na"]
+  Niger:
+    languages: ["fr", "en"]
+    official_source_terms: ["statistiques", "rapport annuel", "ministère", "officiel"]
+    preferred_domains: [".ne"]
+  Nigeria:
+    languages: ["en"]
+    official_source_terms: ["official", "annual report", "statistics", "authority"]
+    preferred_domains: [".ng", ".gov.ng"]
+  Panama:
+    languages: ["es", "en"]
+    official_source_terms: ["estadísticas", "informe anual", "oficial", "gobierno"]
+    preferred_domains: [".gob.pa", ".pa"]
+  Peru:
+    languages: ["es", "en"]
+    official_source_terms: ["estadísticas", "memoria anual", "informe oficial", "gobierno"]
+    preferred_domains: [".gob.pe", ".gov.pe", ".pe"]
+  Rwanda:
+    languages: ["en", "fr"]
+    official_source_terms: ["official", "statistics", "annual report", "rapport annuel"]
+    preferred_domains: [".rw", ".gov.rw"]
+  Sao Tome and Principe:
+    languages: ["pt", "en"]
+    official_source_terms: ["estatísticas", "relatório anual", "oficial", "governo"]
+    preferred_domains: [".st"]
+  Sierra Leone:
+    languages: ["en"]
+    official_source_terms: ["official", "annual report", "statistics", "authority"]
+    preferred_domains: [".sl", ".gov.sl"]
+  South Africa:
+    languages: ["en"]
+    official_source_terms: ["official", "annual report", "statistics", "authority"]
+    preferred_domains: [".za", ".gov.za"]
+  Sri Lanka:
+    languages: ["en", "si", "ta"]
+    official_source_terms: ["official", "annual report", "statistics", "authority", "රජය", "அரசு"]
+    preferred_domains: [".lk", ".gov.lk"]
+  Suriname:
+    languages: ["nl", "en"]
+    official_source_terms: ["statistieken", "jaarverslag", "officieel", "official"]
+    preferred_domains: [".sr", ".gov.sr"]
+  Tanzania:
+    languages: ["en"]
+    official_source_terms: ["official", "annual report", "statistics", "authority"]
+    preferred_domains: [".tz", ".go.tz"]
+  Zambia:
+    languages: ["en"]
+    official_source_terms: ["official", "annual report", "statistics", "authority"]
+    preferred_domains: [".zm", ".gov.zm"]
+
+language_profiles:
+  en:
+    metric_terms:
+      airport_terminal: ["annual passenger traffic", "passenger throughput", "airport statistics"]
+      stadium: ["capacity", "seats", "spectators"]
+      convention_center: ["exhibition area", "meeting space", "venue capacity"]
+      mall_mixed_use: ["gross leasable area", "GLA", "annual footfall"]
+      luxury_hotel_mice: ["rooms", "keys", "ballroom capacity", "meeting space"]
+      office_government: ["gross floor area", "office area", "net lettable area"]
+      transport_hub: ["daily ridership", "passenger traffic", "station passengers"]
+      hospital: ["beds", "outpatients", "annual patients"]
+      university: ["students", "enrollment", "campus population"]
+  pt:
+    metric_terms:
+      airport_terminal: ["movimento de passageiros", "tráfego de passageiros", "estatísticas aeroportuárias"]
+      stadium: ["capacidade", "lugares", "assentos"]
+      convention_center: ["área de exposição", "espaço para eventos", "capacidade"]
+      mall_mixed_use: ["área bruta locável", "ABL", "fluxo anual"]
+      luxury_hotel_mice: ["quartos", "apartamentos", "capacidade do salão", "eventos"]
+      office_government: ["área locável", "área bruta", "edifício corporativo"]
+      transport_hub: ["passageiros por dia", "movimento de passageiros", "estação"]
+      hospital: ["leitos", "atendimentos", "pacientes"]
+      university: ["alunos", "estudantes", "matrículas"]
+  es:
+    metric_terms:
+      airport_terminal: ["tráfico de pasajeros", "movimiento de pasajeros", "estadísticas aeroportuarias"]
+      stadium: ["capacidad", "asientos", "espectadores"]
+      convention_center: ["superficie de exposición", "espacio de reuniones", "capacidad"]
+      mall_mixed_use: ["área bruta alquilable", "GLA", "afluencia anual"]
+      luxury_hotel_mice: ["habitaciones", "salones", "capacidad de banquetes"]
+      office_government: ["superficie alquilable", "área bruta", "oficinas"]
+      transport_hub: ["pasajeros diarios", "tráfico de pasajeros", "estación"]
+      hospital: ["camas", "consultas externas", "pacientes"]
+      university: ["estudiantes", "matrícula", "alumnos"]
+  fr:
+    metric_terms:
+      airport_terminal: ["trafic passagers", "mouvement passagers", "statistiques aéroportuaires"]
+      stadium: ["capacité", "places", "spectateurs"]
+      convention_center: ["surface d'exposition", "espace congrès", "capacité"]
+      mall_mixed_use: ["surface locative brute", "GLA", "fréquentation annuelle"]
+      luxury_hotel_mice: ["chambres", "capacité ballroom", "salles de réunion"]
+      office_government: ["surface de bureaux", "surface locative", "immeuble de bureaux"]
+      transport_hub: ["passagers par jour", "trafic voyageurs", "gare"]
+      hospital: ["lits", "consultations externes", "patients"]
+      university: ["étudiants", "inscriptions", "effectifs"]
+  ar:
+    metric_terms:
+      airport_terminal: ["حركة الركاب", "عدد المسافرين", "إحصاءات المطار"]
+      stadium: ["السعة", "عدد المقاعد", "المتفرجون"]
+      convention_center: ["مساحة المعارض", "قاعات المؤتمرات", "السعة"]
+      mall_mixed_use: ["المساحة القابلة للتأجير", "عدد الزوار", "مركز تجاري"]
+      luxury_hotel_mice: ["الغرف", "قاعات الاجتماعات", "سعة القاعة"]
+      office_government: ["مساحة المكاتب", "مساحة قابلة للتأجير", "مبنى إداري"]
+      transport_hub: ["عدد الركاب اليومي", "حركة الركاب", "محطة"]
+      hospital: ["الأسرّة", "المرضى", "العيادات الخارجية"]
+      university: ["الطلاب", "التسجيل", "الحرم الجامعي"]
+  nl:
+    metric_terms:
+      airport_terminal: ["passagiersverkeer", "aantal passagiers", "luchthaven statistieken"]
+      stadium: ["capaciteit", "zitplaatsen", "toeschouwers"]
+      convention_center: ["tentoonstellingsruimte", "vergaderruimte", "capaciteit"]
+      mall_mixed_use: ["bruto verhuurbaar oppervlak", "bezoekers", "winkelcentrum"]
+      luxury_hotel_mice: ["kamers", "vergaderruimte", "zaalcapaciteit"]
+      office_government: ["kantooroppervlak", "verhuurbaar oppervlak", "kantoorgebouw"]
+      transport_hub: ["dagelijkse reizigers", "passagiersverkeer", "station"]
+      hospital: ["bedden", "patiënten", "polikliniek"]
+      university: ["studenten", "inschrijvingen", "campus"]
+  km:
+    metric_terms:
+      airport_terminal: ["passenger traffic", "airport statistics", "អ្នកដំណើរ"]
+      stadium: ["capacity", "seats", "កៅអី"]
+      convention_center: ["exhibition area", "venue capacity", "មជ្ឈមណ្ឌលសន្និបាត"]
+      mall_mixed_use: ["gross leasable area", "GLA", "shopping mall"]
+      luxury_hotel_mice: ["rooms", "ballroom capacity", "meeting space"]
+      office_government: ["gross floor area", "office tower", "headquarters"]
+      transport_hub: ["daily ridership", "passenger traffic", "station"]
+      hospital: ["beds", "patients"]
+      university: ["students", "enrollment"]
+  si:
+    metric_terms:
+      airport_terminal: ["passenger traffic", "airport statistics", "මගීන්"]
+      stadium: ["capacity", "seats", "ආසන"]
+      convention_center: ["exhibition area", "venue capacity", "සම්මන්ත්‍රණ"]
+      mall_mixed_use: ["gross leasable area", "GLA", "shopping mall"]
+      luxury_hotel_mice: ["rooms", "ballroom capacity", "meeting space"]
+      office_government: ["gross floor area", "office tower", "headquarters"]
+      transport_hub: ["daily ridership", "passenger traffic", "station"]
+      hospital: ["beds", "patients"]
+      university: ["students", "enrollment"]
+  ta:
+    metric_terms:
+      airport_terminal: ["passenger traffic", "airport statistics", "பயணிகள்"]
+      stadium: ["capacity", "seats", "இருக்கைகள்"]
+      convention_center: ["exhibition area", "venue capacity", "மாநாட்டு மையம்"]
+      mall_mixed_use: ["gross leasable area", "GLA", "shopping mall"]
+      luxury_hotel_mice: ["rooms", "ballroom capacity", "meeting space"]
+      office_government: ["gross floor area", "office tower", "headquarters"]
+      transport_hub: ["daily ridership", "passenger traffic", "station"]
+      hospital: ["beds", "patients"]
+      university: ["students", "enrollment"]
+  dv:
+    metric_terms:
+      airport_terminal: ["passenger traffic", "airport statistics", "މުސާފިރުން"]
+      stadium: ["capacity", "seats"]
+      convention_center: ["exhibition area", "venue capacity", "conference centre"]
+      mall_mixed_use: ["gross leasable area", "GLA", "shopping mall"]
+      luxury_hotel_mice: ["rooms", "ballroom capacity", "meeting space"]
+      office_government: ["gross floor area", "office tower", "headquarters"]
+      transport_hub: ["daily ridership", "passenger traffic", "terminal"]
+      hospital: ["beds", "patients"]
+      university: ["students", "enrollment"]
+
+query_templates:
+  structured_source_discovery:
+    - "{property_name} {country} {metric_terms}"
+    - "{property_name} {city} {metric_terms}"
+  official_catalog_discovery:
+    - "{property_name} {country} {official_terms} {metric_terms}"
+    - "{property_name} {preferred_domain} {metric_terms}"
+  metric_extraction:
+    - "{property_name} {metric_terms} {country}"
+  firecrawl_gap_fill:
+    - "{property_name} {country} {metric_terms} {official_terms}"

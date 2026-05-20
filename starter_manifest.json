@@ -1,0 +1,21 @@
+{
+  "name": "isite2_codex_starter_pack",
+  "version": "0.1.0",
+  "created_for": "iSite2 产品迭代计划",
+  "purpose": "Codex-readable starter package for multi-agent public-evidence scanning product",
+  "entrypoints": [
+    "README.md",
+    "AGENTS.md",
+    ".agents/skills/isite2-scan/SKILL.md",
+    "tasks/codex/00_bootstrap_foundation.md"
+  ],
+  "core_principles": [
+    "full_scan_not_truncated",
+    "evidence_before_judgment",
+    "scene_specific_modeling",
+    "build_status_separate_evidence_chain",
+    "inference_trace_required",
+    "main_table_short_and_auditable",
+    "review_queue_with_concrete_actions"
+  ]
+}

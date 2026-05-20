@@ -1,0 +1,53 @@
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-isite2_public}
+      POSTGRES_USER: ${POSTGRES_USER:-isite}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in the compose env file}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-isite}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-isite2_public}
+      ISITE2_APP_MODE: public_view
+      ISITE2_ENABLE_OVERLAY_SYNC: "0"
+      ENVIRONMENT: production
+    expose:
+      - "8000"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - web
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      ISITE2_PUBLIC_DOMAIN: ${ISITE2_PUBLIC_DOMAIN:?set ISITE2_PUBLIC_DOMAIN in the compose env file}
+      ISITE2_BASIC_AUTH_USER: ${ISITE2_BASIC_AUTH_USER:-client}
+      ISITE2_BASIC_AUTH_HASH: ${ISITE2_BASIC_AUTH_HASH:?set ISITE2_BASIC_AUTH_HASH in the compose env file}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
