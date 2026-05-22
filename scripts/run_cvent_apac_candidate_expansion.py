@@ -47,6 +47,7 @@ COUNTRY_META = {
     "Chile": {"slug": "chile", "cc": "CL", "osm_cc": "cl"},
     "Ecuador": {"slug": "ecuador", "cc": "EC", "osm_cc": "ec"},
     "Colombia": {"slug": "colombia", "cc": "CO", "osm_cc": "co"},
+    "Philippines": {"slug": "philippines", "cc": "PH", "osm_cc": "ph"},
 }
 
 COUNTRY_REGION = {
@@ -57,6 +58,7 @@ COUNTRY_REGION = {
     "Chile": "Latin America",
     "Ecuador": "Latin America",
     "Colombia": "Latin America",
+    "Philippines": "Asia Pacific",
 }
 
 PLACEHOLDER_IMAGE_TOKENS = (

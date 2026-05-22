@@ -17,6 +17,7 @@ from isite2.rules.config_loader import load_source_registry, scene_definitions  
 
 def setup_function() -> None:
     api_main.app.state.overlay_sync_enabled = False
+    api_main._reset_satellite_tile_breaker()
     repository.clear()
 
 
@@ -31,6 +32,10 @@ def test_health_and_rules_endpoints() -> None:
 
 def test_public_view_runtime_config_and_route_gate(monkeypatch) -> None:
     monkeypatch.setenv("ISITE2_APP_MODE", "public_view")
+    monkeypatch.delenv("ISITE2_SATELLITE_TILE_TEMPLATE", raising=False)
+    monkeypatch.delenv("ISITE2_SATELLITE_TILE_TOKEN", raising=False)
+    monkeypatch.delenv("ISITE2_SATELLITE_TILE_ATTRIBUTION", raising=False)
+    monkeypatch.delenv("ISITE2_SATELLITE_TILE_SIZE", raising=False)
     client = TestClient(app)
 
     config = client.get("/runtime-config").json()
@@ -41,6 +46,11 @@ def test_public_view_runtime_config_and_route_gate(monkeypatch) -> None:
             "rag": False,
             "connectors": False,
             "geocode": False,
+        },
+        "map": {
+            "satelliteTileTemplate": "/map/satellite-tiles/{z}/{y}/{x}",
+            "satelliteTileSize": 512,
+            "satelliteAttribution": "Source: MapTiler Satellite",
         },
     }
     assert client.get("/health").status_code == 200
@@ -61,6 +71,121 @@ def test_public_view_runtime_config_and_route_gate(monkeypatch) -> None:
         client.get("/docs"),
     ]
     assert {response.status_code for response in blocked_requests} == {403}
+
+
+def test_satellite_tile_proxy_caches_success(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("ISITE2_TILE_CACHE_DIR", str(tmp_path / "tiles"))
+    monkeypatch.setenv("ISITE2_SATELLITE_TILE_TEMPLATE", "https://tiles.example/{z}/{y}/{x}.jpg")
+    monkeypatch.delenv("ISITE2_SATELLITE_TILE_TOKEN", raising=False)
+    calls = []
+
+    def fake_fetch(url: str) -> tuple[bytes, str]:
+        calls.append(url)
+        return b"tile-bytes", "image/png"
+
+    monkeypatch.setattr(api_main, "_fetch_satellite_tile_from_upstream", fake_fetch)
+    client = TestClient(app)
+
+    first = client.get("/map/satellite-tiles/1/0/1")
+    second = client.get("/map/satellite-tiles/1/0/1")
+
+    assert first.status_code == 200
+    assert first.content == b"tile-bytes"
+    assert first.headers["content-type"].startswith("image/png")
+    assert second.status_code == 200
+    assert calls == ["https://tiles.example/1/0/1.jpg"]
+
+
+def test_satellite_tile_proxy_uses_bundled_maptiler_token_by_default(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("ISITE2_TILE_CACHE_DIR", str(tmp_path / "tiles"))
+    monkeypatch.delenv("ISITE2_SATELLITE_TILE_TEMPLATE", raising=False)
+    monkeypatch.delenv("ISITE2_SATELLITE_TILE_TOKEN", raising=False)
+    calls = []
+
+    def fake_fetch(url: str) -> tuple[bytes, str]:
+        calls.append(url)
+        return b"tile-bytes", "image/webp"
+
+    monkeypatch.setattr(api_main, "_fetch_satellite_tile_from_upstream", fake_fetch)
+    client = TestClient(app)
+
+    response = client.get("/map/satellite-tiles/5/12/16")
+
+    assert response.status_code == 200
+    assert calls == [
+        "https://api.maptiler.com/tiles/satellite-v2/5/16/12.jpg?key=rnpOwVToJlpNtgw35V2t"
+    ]
+
+
+def test_satellite_tile_proxy_uses_maptiler_token_without_exposing_it(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("ISITE2_TILE_CACHE_DIR", str(tmp_path / "tiles"))
+    monkeypatch.delenv("ISITE2_SATELLITE_TILE_TEMPLATE", raising=False)
+    monkeypatch.setenv("ISITE2_SATELLITE_TILE_TOKEN", "secret-maptiler-token")
+    monkeypatch.delenv("ISITE2_SATELLITE_TILE_ATTRIBUTION", raising=False)
+    monkeypatch.delenv("ISITE2_SATELLITE_TILE_SIZE", raising=False)
+    calls = []
+
+    def fake_fetch(url: str) -> tuple[bytes, str]:
+        calls.append(url)
+        return b"tile-bytes", "image/jpeg"
+
+    monkeypatch.setattr(api_main, "_fetch_satellite_tile_from_upstream", fake_fetch)
+    client = TestClient(app)
+
+    config = client.get("/runtime-config").json()
+    response = client.get("/map/satellite-tiles/3/2/4")
+
+    assert response.status_code == 200
+    assert calls == [
+        "https://api.maptiler.com/tiles/satellite-v2/3/4/2.jpg?key=secret-maptiler-token"
+    ]
+    assert config["map"]["satelliteTileTemplate"] == "/map/satellite-tiles/{z}/{y}/{x}"
+    assert config["map"]["satelliteTileSize"] == 512
+    assert config["map"]["satelliteAttribution"] == "Source: MapTiler Satellite"
+    assert "secret-maptiler-token" not in str(config)
+
+
+def test_satellite_tile_proxy_validates_and_negative_caches(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("ISITE2_TILE_CACHE_DIR", str(tmp_path / "tiles"))
+    monkeypatch.setenv("ISITE2_SATELLITE_TILE_TEMPLATE", "https://tiles.example/{z}/{y}/{x}.jpg")
+    monkeypatch.delenv("ISITE2_SATELLITE_TILE_TOKEN", raising=False)
+    calls = []
+
+    def fake_fetch(url: str) -> tuple[bytes, str]:
+        calls.append(url)
+        raise RuntimeError("blocked upstream")
+
+    monkeypatch.setattr(api_main, "_fetch_satellite_tile_from_upstream", fake_fetch)
+    client = TestClient(app)
+
+    assert client.get("/map/satellite-tiles/19/0/0").status_code == 400
+    assert client.get("/map/satellite-tiles/2/4/0").status_code == 400
+    first_failure = client.get("/map/satellite-tiles/1/0/1")
+    second_failure = client.get("/map/satellite-tiles/1/0/1")
+
+    assert first_failure.status_code == 502
+    assert second_failure.status_code == 502
+    assert len(calls) == 1
+
+
+def test_satellite_tile_proxy_breaker_stops_fatal_request_storm(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("ISITE2_TILE_CACHE_DIR", str(tmp_path / "tiles"))
+    monkeypatch.setenv("ISITE2_SATELLITE_TILE_TEMPLATE", "https://tiles.example/{z}/{y}/{x}.jpg")
+    calls = []
+
+    def fake_fetch(url: str) -> tuple[bytes, str]:
+        calls.append(url)
+        raise api_main._SatelliteTileUpstreamError("forbidden", status_code=403)
+
+    monkeypatch.setattr(api_main, "_fetch_satellite_tile_from_upstream", fake_fetch)
+    client = TestClient(app)
+
+    first_failure = client.get("/map/satellite-tiles/1/0/0")
+    breaker_failure = client.get("/map/satellite-tiles/1/0/1")
+
+    assert first_failure.status_code == 502
+    assert breaker_failure.status_code == 503
+    assert calls == ["https://tiles.example/1/0/0.jpg"]
 
 
 def test_scan_run_post_list_get_and_top_n_display_only() -> None:

@@ -10,21 +10,19 @@ import {
   ExternalLink,
   FileSpreadsheet,
   ImageOff,
-  Layers3,
   LayoutGrid,
   List,
   MapPin,
-  Maximize2,
-  Minimize2,
   Presentation,
-  RotateCcw,
   Search,
-  SlidersHorizontal,
   X,
 } from "lucide-react";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
+import type { GeoVisualMode, SatelliteBounds, SatelliteCamera, SatelliteMarker } from "./SatelliteNavigator";
 
 import "./styles.css";
+
+const SatelliteNavigator = React.lazy(() => import("./SatelliteNavigator"));
 
 type HeroImage = {
   url: string;
@@ -328,11 +326,15 @@ type RuntimeConfig = {
     connectors: boolean;
     geocode: boolean;
   };
+  map: {
+    satelliteTileTemplate: string;
+    satelliteTileSize: number;
+    satelliteAttribution: string;
+  };
 };
 
 type ViewMode = "overview" | "country" | "city" | "property";
 type WorkspaceListMode = "card" | "dense";
-type MapPaneMode = "expanded" | "collapsed";
 
 type EvidenceGapSummary = {
   missingPrimaryMetricCount: number;
@@ -349,6 +351,11 @@ const DEFAULT_RUNTIME_CONFIG: RuntimeConfig = {
     rag: true,
     connectors: true,
     geocode: true,
+  },
+  map: {
+    satelliteTileTemplate: "/map/satellite-tiles/{z}/{y}/{x}",
+    satelliteTileSize: 512,
+    satelliteAttribution: "Source: VersaTiles Satellite",
   },
 };
 
@@ -450,8 +457,6 @@ const SCENE_PRIMARY_METRIC_FILTERS: Record<string, ScenePrimaryMetricFilter> = {
     indicators: ["passenger_throughput", "annual_passenger_throughput"],
   },
 };
-
-const DEFAULT_METRIC_THRESHOLD = "0";
 
 type TargetRegion = "Latin America" | "Asia Pacific" | "Middle East & Central Asia" | "Africa";
 
@@ -672,11 +677,13 @@ function App() {
   const globeRef = useRef<GlobeMethods | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const loadSequenceRef = useRef(0);
+  const countrySummaryCacheRef = useRef<CountrySummary[] | null>(null);
   const globeModeRef = useRef<GlobeMode>("overview");
   const pointOfViewOverrideRef = useRef<{ lat: number; lng: number } | null>(
     initialPointOfViewOverride(),
   );
   const [stageSize, setStageSize] = useState({ width: 900, height: 720 });
+  const [globeReady, setGlobeReady] = useState(false);
   const [features, setFeatures] = useState<MapFeature[]>([]);
   const [packets, setPackets] = useState<SitePacket[]>([]);
   const [summaries, setSummaries] = useState<CountrySummary[]>([]);
@@ -697,10 +704,7 @@ function App() {
   const [evidenceFilter, setEvidenceFilter] = useState("");
   const [actionFilter, setActionFilter] = useState("");
   const [reviewOnly, setReviewOnly] = useState(false);
-  const [metricThresholds, setMetricThresholds] = useState<Record<string, string>>({});
-  const [globalMetricThreshold, setGlobalMetricThreshold] = useState(DEFAULT_METRIC_THRESHOLD);
   const [listMode, setListMode] = useState<WorkspaceListMode>("card");
-  const [mapPaneMode, setMapPaneMode] = useState<MapPaneMode>("collapsed");
   const [expandedClusterKey, setExpandedClusterKey] = useState("");
   const [screenGlobeMarkers, setScreenGlobeMarkers] = useState<ScreenDisplayGlobeMarker[]>([]);
   const [cityCentroidCache, setCityCentroidCache] = useState<Map<string, CityCentroidCacheValue>>(
@@ -715,8 +719,16 @@ function App() {
 
   const useMockGlobe = useMemo(() => new URLSearchParams(window.location.search).has("mock_globe"), []);
   const useMockCluster = useMemo(() => new URLSearchParams(window.location.search).has("mock_cluster"), []);
+  const useMockSatellite = useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.has("mock_satellite") || params.has("mock_globe");
+  }, []);
   const enabledFeatures = runtimeConfig.features;
   const countryPolygons = useMemo(() => loadCountryPolygons(), []);
+  const countryDisplayPositionCache = useMemo(
+    () => buildCountryDisplayPositionCache(countryPolygons),
+    [countryPolygons],
+  );
   const countryNamesWithData = useMemo(
     () => new Set(summaries.map((summary) => summary.country)),
     [summaries],
@@ -730,21 +742,19 @@ function App() {
     [summaries],
   );
   const countryMarkers = useMemo(
-    () => aggregateCountryMarkers(summaries, features, countryPolygons),
-    [countryPolygons, features, summaries],
+    () => aggregateCountryMarkers(summaries, features, countryDisplayPositionCache),
+    [countryDisplayPositionCache, features, summaries],
   );
-  const metricThresholdKey = useMemo(
-    () => JSON.stringify(metricThresholds),
-    [metricThresholds],
-  );
-  const metricFilteredPackets = useMemo(
-    () => filterPacketsByPrimaryMetric(packets, metricThresholds),
-    [metricThresholdKey, packets],
-  );
+  const metricFilteredPackets = packets;
   const cityMarkers = useMemo(
-    () => selectedCountry
-      ? aggregateCityMarkers(metricFilteredPackets, features, cityCentroidCache)
-      : aggregateCitySummaryMarkers(citySummaries),
+    () => {
+      const summaryMarkers = aggregateCitySummaryMarkers(citySummaries);
+      if (!selectedCountry) {
+        return summaryMarkers;
+      }
+      const packetMarkers = aggregateCityMarkers(metricFilteredPackets, features, cityCentroidCache);
+      return packetMarkers.length > 0 ? packetMarkers : summaryMarkers;
+    },
     [cityCentroidCache, citySummaries, features, metricFilteredPackets, selectedCountry],
   );
   const selectedCountryCityCount = useMemo(
@@ -821,20 +831,57 @@ function App() {
     [metricFilteredPackets, selectedPropertyId],
   );
   const viewMode = deriveViewMode(selectedCountry, selectedCityKey, selectedPropertyId);
-  const effectiveMapPaneMode: MapPaneMode = viewMode === "overview" ? "expanded" : mapPaneMode;
   const gapSummary = useMemo(
     () => summarizeEvidenceGaps(panelPackets),
     [panelPackets],
   );
-  const sceneOptions = useMemo(() => {
-    const scenes = new Set<string>();
-    summaries.forEach((summary) => {
-      Object.keys(summary.scenes).forEach((scene) => scenes.add(scene));
-    });
-    packets.forEach((packet) => scenes.add(packet.entity.scene_type));
-    features.forEach((item) => scenes.add(item.properties.scene_type));
-    return Array.from(scenes).sort();
-  }, [features, packets, summaries]);
+  const geoVisualMode = deriveGeoVisualMode(viewMode);
+  const satelliteCamera = useMemo(
+    () => satelliteCameraForScope({
+      mode: geoVisualMode,
+      selectedCountry,
+      selectedCityMarker,
+      selectedPacket,
+      cityMarkers,
+      visiblePackets,
+      metricFilteredPackets,
+      features,
+      countryPolygons,
+    }),
+    [
+      cityMarkers,
+      countryPolygons,
+      features,
+      geoVisualMode,
+      metricFilteredPackets,
+      selectedCityMarker,
+      selectedCountry,
+      selectedPacket,
+      visiblePackets,
+    ],
+  );
+  const satelliteMarkers = useMemo(
+    () => satelliteMarkersForScope({
+      mode: geoVisualMode,
+      selectedCountry,
+      selectedCityKey,
+      selectedPropertyId,
+      selectedPacket,
+      cityMarkers,
+      visiblePackets,
+      metricFilteredPackets,
+    }),
+    [
+      cityMarkers,
+      geoVisualMode,
+      metricFilteredPackets,
+      selectedCityKey,
+      selectedCountry,
+      selectedPacket,
+      selectedPropertyId,
+      visiblePackets,
+    ],
+  );
   const workspaceContext = useMemo(
     () => workspaceContextLabel({
       selectedCountry,
@@ -857,6 +904,24 @@ function App() {
   );
   const globeMode: GlobeMode = viewMode === "overview" ? "overview" : "focused";
   globeModeRef.current = globeMode;
+  const overviewProjectedMarkerCount = useMockGlobe
+    ? useMockCluster
+      ? mockScreenGlobeMarkers.length
+      : visibleGlobeMarkers.length
+    : screenGlobeMarkers.length;
+  const overviewSummaryReady = !loading;
+  const overviewRegionReady = overviewSummaryReady && (summaries.length === 0 || regionSummaries.length > 0);
+  const overviewMarkersReady = overviewSummaryReady
+    && (visibleGlobeMarkers.length === 0 || overviewProjectedMarkerCount > 0);
+  const initialOverviewReady = viewMode !== "overview"
+    || (globeReady && overviewSummaryReady && overviewRegionReady && overviewMarkersReady);
+  const showInitialThinking = viewMode === "overview" && !initialOverviewReady;
+  const aiThinkingStage = aiThinkingStageLabel({
+    globeReady,
+    overviewMarkersReady,
+    overviewRegionReady,
+    overviewSummaryReady,
+  });
 
   const notify = useCallback((message: string, tone: Toast["tone"] = "info") => {
     const id = Date.now();
@@ -888,6 +953,12 @@ function App() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (useMockGlobe) {
+      setGlobeReady(true);
+    }
+  }, [useMockGlobe]);
 
   const askRag = useCallback(async () => {
     if (!enabledFeatures.rag) {
@@ -951,8 +1022,11 @@ function App() {
     }
     const query = params.toString();
     try {
+      const cachedCountrySummary = countrySummaryCacheRef.current;
       const [countrySummary, citySummary] = await Promise.all([
-        fetchJson<CountrySummary[]>("/map/country-summary"),
+        cachedCountrySummary
+          ? Promise.resolve(cachedCountrySummary)
+          : fetchJson<CountrySummary[]>("/map/country-summary"),
         selectedCountry
           ? fetchJson<{ cities: CitySummary[] }>(withQuery("/map/city-summary", query))
           : Promise.resolve({ cities: [] }),
@@ -960,7 +1034,10 @@ function App() {
       if (sequence !== loadSequenceRef.current) {
         return;
       }
-      setSummaries(countrySummary || []);
+      if (!countrySummaryCacheRef.current) {
+        countrySummaryCacheRef.current = countrySummary || [];
+      }
+      setSummaries(countrySummaryCacheRef.current);
       setCitySummaries(citySummary.cities || []);
       setLoading(false);
 
@@ -1080,7 +1157,6 @@ function App() {
   }, [
     actionFilter,
     evidenceFilter,
-    metricThresholdKey,
     reviewOnly,
     sceneFilter,
     selectedCityKey,
@@ -1194,6 +1270,9 @@ function App() {
   ]);
 
   useEffect(() => {
+    if (viewMode === "overview" && !initialOverviewReady) {
+      return;
+    }
     const refreshDiscoveryStatus = async () => {
       try {
         setDiscoveryStatus(await fetchJson<DiscoveryStatus>("/discovery/status"));
@@ -1204,7 +1283,7 @@ function App() {
     void refreshDiscoveryStatus();
     const interval = window.setInterval(refreshDiscoveryStatus, 30000);
     return () => window.clearInterval(interval);
-  }, []);
+  }, [initialOverviewReady, viewMode]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -1352,6 +1431,21 @@ function App() {
     setSelectedPropertyId(propertyId);
   }, [applyGlobeMode]);
 
+  const handleSatelliteMarkerSelect = useCallback((marker: SatelliteMarker) => {
+    applyGlobeMode("focused");
+    if (marker.kind === "city_cluster" || marker.kind === "property_cluster") {
+      return;
+    }
+    if (marker.kind === "city") {
+      const city = cityMarkers.find((item) => item.key === marker.id);
+      if (city) {
+        handleCitySelect(city);
+      }
+      return;
+    }
+    handlePropertySelect(marker.id);
+  }, [applyGlobeMode, cityMarkers, handleCitySelect, handlePropertySelect]);
+
   const handleBackToList = useCallback(() => {
     applyGlobeMode(selectedCountry ? "focused" : "overview");
     setSelectedPropertyId("");
@@ -1416,48 +1510,16 @@ function App() {
     ],
   );
 
-  const handleMetricThresholdChange = useCallback(
-    (value: string) => {
-      const normalized = normalizeThresholdInput(value);
-      if (sceneFilter) {
-        setMetricThresholds((current) => ({
-          ...current,
-          [sceneFilter]: normalized,
-        }));
-        return;
-      }
-      setGlobalMetricThreshold(normalized);
-      setMetricThresholds((current) => {
-        const next = { ...current };
-        Object.keys(SCENE_PRIMARY_METRIC_FILTERS).forEach((scene) => {
-          next[scene] = normalized;
-        });
-        sceneOptions.forEach((scene) => {
-          next[scene] = normalized;
-        });
-        return next;
-      });
-    },
-    [sceneFilter, sceneOptions],
-  );
-
-  const activeMetricThreshold = sceneFilter
-    ? metricThresholds[sceneFilter] ?? globalMetricThreshold
-    : globalMetricThreshold;
-  const activeMetricLabel = sceneFilter
-    ? primaryMetricFilterLabel(sceneFilter)
-    : "Primary metric";
-
   return (
     <main
       className="app-shell"
       data-view-mode={viewMode}
-      data-map-pane={effectiveMapPaneMode}
     >
       <section
         className="globe-stage"
         ref={stageRef}
-        aria-label="3D opportunity globe"
+        aria-label={geoVisualMode === "globe" ? "3D opportunity globe" : "Satellite opportunity map"}
+        data-geo-visual-mode={geoVisualMode}
         data-globe-mode={globeMode}
         data-auto-rotate={globeMode === "overview" ? "true" : "false"}
       >
@@ -1467,22 +1529,6 @@ function App() {
             <h1>Opportunity Globe</h1>
           </div>
           <div className="toolbar" aria-label="Opportunity actions">
-            {viewMode !== "overview" && (
-              <button
-                aria-label={effectiveMapPaneMode === "expanded" ? "Collapse map" : "Expand map"}
-                type="button"
-                onClick={() => setMapPaneMode((current) =>
-                  current === "expanded" ? "collapsed" : "expanded"
-                )}
-              >
-                {effectiveMapPaneMode === "expanded" ? (
-                  <Minimize2 size={16} aria-hidden="true" />
-                ) : (
-                  <Maximize2 size={16} aria-hidden="true" />
-                )}
-                <span>{effectiveMapPaneMode === "expanded" ? "Collapse map" : "Expand map"}</span>
-              </button>
-            )}
             {enabledFeatures.rag && (
               <button
                 aria-label="Ask iSite2"
@@ -1516,191 +1562,152 @@ function App() {
           </div>
         </header>
 
-        <div className="filter-strip" aria-label="Opportunity filters">
-          <label>
-            <Search size={14} aria-hidden="true" />
-            <select value={sceneFilter} onChange={(event) => setSceneFilter(event.target.value)}>
-              <option value="">All scenes</option>
-              {sceneOptions.map((scene) => (
-                <option key={scene} value={scene}>
-                  {sceneLabel(scene)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <Layers3 size={14} aria-hidden="true" />
-            <select
-              value={evidenceFilter}
-              onChange={(event) => setEvidenceFilter(event.target.value)}
-            >
-              <option value="">All evidence</option>
-              <option value="Verified">Verified</option>
-              <option value="Supported">Supported</option>
-              <option value="Indicative">Indicative</option>
-              <option value="Insufficient">Insufficient</option>
-            </select>
-          </label>
-          <label>
-            <RotateCcw size={14} aria-hidden="true" />
-            <select
-              value={actionFilter}
-              onChange={(event) => setActionFilter(event.target.value)}
-            >
-              <option value="">All actions</option>
-              <option value="Direct Recommend">Direct Recommend</option>
-              <option value="Survey First">Survey First</option>
-              <option value="Review Queue">Review Queue</option>
-              <option value="Monitor">Monitor</option>
-            </select>
-          </label>
-          <label className="metric-filter">
-            <SlidersHorizontal size={14} aria-hidden="true" />
-            <span>{activeMetricLabel}</span>
-            <input
-              aria-label={`${activeMetricLabel} minimum`}
-              type="number"
-              min="0"
-              step="1"
-              value={activeMetricThreshold}
-              onChange={(event) => handleMetricThresholdChange(event.target.value)}
-            />
-          </label>
-          <label className="toggle">
-            <input
-              type="checkbox"
-              checked={reviewOnly}
-              onChange={(event) => setReviewOnly(event.target.checked)}
-            />
-            <span>Review</span>
-          </label>
-        </div>
-
-        {useMockGlobe ? (
-          <>
-            <canvas
-              className="globe-test-canvas"
-              width={stageSize.width}
-              height={stageSize.height}
-              aria-label="Mock 3D opportunity globe"
-            />
-            {useMockCluster ? (
-              <div className="marker-overlay-layer mock-cluster-layer" aria-label="Mock globe marker layer">
-                {mockScreenGlobeMarkers.map((marker) => (
-                  <GlobeMarkerButton
-                    key={marker.key}
-                    marker={marker}
-                    active={marker.kind === "city" && marker.key === selectedCityKey}
-                    onSelect={handleGlobeMarkerSelect}
-                    spiderChild={marker.spiderChild}
-                    style={{
-                      opacity: marker.visible ? 1 : 0,
-                      visibility: marker.visible ? "visible" : "hidden",
-                      pointerEvents: marker.visible ? "auto" : "none",
-                      transform: `translate3d(${marker.x}px, ${marker.y}px, 0) translate(-50%, -50%)`,
-                    }}
-                  />
-                ))}
-              </div>
+        {geoVisualMode === "globe" ? (
+          <div className="geo-visual-layer geo-visual-layer-active" key="globe">
+            {useMockGlobe ? (
+              <>
+                <canvas
+                  className="globe-test-canvas"
+                  width={stageSize.width}
+                  height={stageSize.height}
+                  aria-label="Mock 3D opportunity globe"
+                />
+                {useMockCluster ? (
+                  <div className="marker-overlay-layer mock-cluster-layer" aria-label="Mock globe marker layer">
+                    {mockScreenGlobeMarkers.map((marker) => (
+                      <GlobeMarkerButton
+                        key={marker.key}
+                        marker={marker}
+                        active={marker.kind === "city" && marker.key === selectedCityKey}
+                        onSelect={handleGlobeMarkerSelect}
+                        spiderChild={marker.spiderChild}
+                        style={{
+                          opacity: marker.visible ? 1 : 0,
+                          visibility: marker.visible ? "visible" : "hidden",
+                          pointerEvents: marker.visible ? "auto" : "none",
+                          transform: `translate3d(${marker.x}px, ${marker.y}px, 0) translate(-50%, -50%)`,
+                        }}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mock-marker-layer" aria-label="Mock globe marker layer">
+                    {visibleGlobeMarkers.map((marker) => (
+                      <GlobeMarkerButton
+                        key={marker.key}
+                        marker={marker}
+                        active={marker.kind === "city" && marker.key === selectedCityKey}
+                        onSelect={handleGlobeMarkerSelect}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
             ) : (
-              <div className="mock-marker-layer" aria-label="Mock globe marker layer">
-                {visibleGlobeMarkers.map((marker) => (
-                  <GlobeMarkerButton
-                    key={marker.key}
-                    marker={marker}
-                    active={marker.kind === "city" && marker.key === selectedCityKey}
-                    onSelect={handleGlobeMarkerSelect}
-                  />
-                ))}
-              </div>
-            )}
-          </>
-        ) : (
-          <>
-            <Globe
-              ref={globeRef}
-              width={stageSize.width}
-              height={stageSize.height}
-              backgroundColor="rgba(0,0,0,0)"
-              globeImageUrl={EARTH_IMAGE}
-              bumpImageUrl={EARTH_BUMP}
-              showAtmosphere
-              atmosphereColor="#55f1d1"
-              atmosphereAltitude={0.18}
-              polygonsData={countryPolygons}
-              polygonCapColor={(country) =>
-                polygonCapColor(country as CountryFeature, selectedCountry, hoveredCountry, countryNamesWithData)
-              }
-              polygonSideColor={(country) =>
-                countryName(country as CountryFeature) === selectedCountry
-                  ? "rgba(255, 213, 122, 0.2)"
-                  : "rgba(32, 50, 48, 0.18)"
-              }
-              polygonStrokeColor={(country) =>
-                countryName(country as CountryFeature) === selectedCountry
-                  ? "rgba(255, 222, 135, 0.95)"
-                  : countryNamesWithData.has(countryName(country as CountryFeature))
-                    ? "rgba(74, 245, 212, 0.72)"
-                    : "rgba(255, 255, 255, 0.16)"
-              }
-              polygonAltitude={(country) =>
-                countryName(country as CountryFeature) === selectedCountry ? 0.03 : 0.01
-              }
-              onPolygonClick={(country) => handleCountryClick(country as CountryFeature)}
-              onPolygonHover={(country) =>
-                setHoveredCountry(country ? countryName(country as CountryFeature) : "")
-              }
-              pointsData={[]}
-              labelsData={[]}
-              onGlobeReady={() => {
-                const pointOfViewOverride = pointOfViewOverrideRef.current;
-                if (pointOfViewOverride) {
-                  globeModeRef.current = "focused";
-                  globeRef.current?.pointOfView({
-                    lat: pointOfViewOverride.lat,
-                    lng: pointOfViewOverride.lng,
-                    altitude: OVERVIEW_ALTITUDE,
-                  }, 0);
-                  configureGlobeControls(globeRef.current, "focused");
-                  return;
-                }
-                const center = selectedCityMarker
-                  ? cityFocus(selectedCityMarker)
-                  : selectedCountry
-                    ? countryFocus(selectedCountry, features, countryPolygons)
-                    : propertyFocus(features);
-                const mode: GlobeMode = selectedCityMarker || selectedCountry ? "focused" : "overview";
-                globeRef.current?.pointOfView({
-                  lat: center.lat,
-                  lng: center.lng,
-                  altitude: selectedCityMarker
-                    ? PROPERTY_ALTITUDE
-                    : selectedCountry
-                      ? COUNTRY_ALTITUDE
-                      : OVERVIEW_ALTITUDE,
-                }, 0);
-                applyGlobeMode(mode);
-              }}
-            />
-            <div className="marker-overlay-layer" aria-label="Globe marker layer">
-              {screenGlobeMarkers.map((marker) => (
-                <GlobeMarkerButton
-                  key={marker.key}
-                  marker={marker}
-                  active={marker.kind === "city" && marker.key === selectedCityKey}
-                  onSelect={handleGlobeMarkerSelect}
-                  spiderChild={marker.spiderChild}
-                  style={{
-                    opacity: marker.visible ? 1 : 0,
-                    visibility: marker.visible ? "visible" : "hidden",
-                    pointerEvents: marker.visible ? "auto" : "none",
-                    transform: `translate3d(${marker.x}px, ${marker.y}px, 0) translate(-50%, -50%)`,
+              <>
+                <Globe
+                  ref={globeRef}
+                  width={stageSize.width}
+                  height={stageSize.height}
+                  backgroundColor="rgba(0,0,0,0)"
+                  globeImageUrl={EARTH_IMAGE}
+                  bumpImageUrl={EARTH_BUMP}
+                  showAtmosphere
+                  atmosphereColor="#55f1d1"
+                  atmosphereAltitude={0.18}
+                  polygonsData={countryPolygons}
+                  polygonCapColor={(country) =>
+                    polygonCapColor(country as CountryFeature, selectedCountry, hoveredCountry, countryNamesWithData)
+                  }
+                  polygonSideColor={(country) =>
+                    countryName(country as CountryFeature) === selectedCountry
+                      ? "rgba(255, 213, 122, 0.2)"
+                      : "rgba(32, 50, 48, 0.18)"
+                  }
+                  polygonStrokeColor={(country) =>
+                    countryName(country as CountryFeature) === selectedCountry
+                      ? "rgba(255, 222, 135, 0.95)"
+                      : countryNamesWithData.has(countryName(country as CountryFeature))
+                        ? "rgba(74, 245, 212, 0.72)"
+                        : "rgba(255, 255, 255, 0.16)"
+                  }
+                  polygonAltitude={(country) =>
+                    countryName(country as CountryFeature) === selectedCountry ? 0.03 : 0.01
+                  }
+                  onPolygonClick={(country) => handleCountryClick(country as CountryFeature)}
+                  onPolygonHover={(country) =>
+                    setHoveredCountry(country ? countryName(country as CountryFeature) : "")
+                  }
+                  pointsData={[]}
+                  labelsData={[]}
+                  onGlobeReady={() => {
+                    setGlobeReady(true);
+                    const pointOfViewOverride = pointOfViewOverrideRef.current;
+                    if (pointOfViewOverride) {
+                      globeModeRef.current = "focused";
+                      globeRef.current?.pointOfView({
+                        lat: pointOfViewOverride.lat,
+                        lng: pointOfViewOverride.lng,
+                        altitude: OVERVIEW_ALTITUDE,
+                      }, 0);
+                      configureGlobeControls(globeRef.current, "focused");
+                      return;
+                    }
+                    const center = selectedCityMarker
+                      ? cityFocus(selectedCityMarker)
+                      : selectedCountry
+                        ? countryFocus(selectedCountry, features, countryPolygons)
+                        : propertyFocus(features);
+                    const mode: GlobeMode = selectedCityMarker || selectedCountry ? "focused" : "overview";
+                    globeRef.current?.pointOfView({
+                      lat: center.lat,
+                      lng: center.lng,
+                      altitude: selectedCityMarker
+                        ? PROPERTY_ALTITUDE
+                        : selectedCountry
+                          ? COUNTRY_ALTITUDE
+                          : OVERVIEW_ALTITUDE,
+                    }, 0);
+                    applyGlobeMode(mode);
                   }}
                 />
-              ))}
-            </div>
-          </>
+                <div className="marker-overlay-layer" aria-label="Globe marker layer">
+                  {screenGlobeMarkers.map((marker) => (
+                    <GlobeMarkerButton
+                      key={marker.key}
+                      marker={marker}
+                      active={marker.kind === "city" && marker.key === selectedCityKey}
+                      onSelect={handleGlobeMarkerSelect}
+                      spiderChild={marker.spiderChild}
+                      style={{
+                        opacity: marker.visible ? 1 : 0,
+                        visibility: marker.visible ? "visible" : "hidden",
+                        pointerEvents: marker.visible ? "auto" : "none",
+                        transform: `translate3d(${marker.x}px, ${marker.y}px, 0) translate(-50%, -50%)`,
+                      }}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
+          <React.Suspense fallback={<SatelliteNavigatorFallback mode={geoVisualMode} />}>
+            <SatelliteNavigator
+              mode={geoVisualMode}
+              camera={satelliteCamera}
+              markers={satelliteMarkers}
+              stageSize={stageSize}
+              mock={useMockSatellite}
+              tileTemplate={runtimeConfig.map.satelliteTileTemplate}
+              tileSize={runtimeConfig.map.satelliteTileSize}
+              attribution={runtimeConfig.map.satelliteAttribution}
+              onMarkerSelect={handleSatelliteMarkerSelect}
+            />
+          </React.Suspense>
         )}
+
+        {showInitialThinking && <AIThinkingOverlay stage={aiThinkingStage} />}
 
         <CountryScopeControl
           summaries={summaries}
@@ -2055,6 +2062,76 @@ function RagResult({ result }: { result: RagQueryResponse }) {
   );
 }
 
+function AIThinkingOverlay({ stage }: { stage: string }) {
+  return (
+    <div className="ai-thinking-overlay" role="status" aria-live="polite">
+      <div className="ai-thinking-card">
+        <span className="ai-thinking-orbit" aria-hidden="true" />
+        <div>
+          <span className="eyebrow">AI Thinking</span>
+          <strong>{stage}</strong>
+          <small>Preparing the opportunity globe</small>
+        </div>
+        <span className="ai-thinking-scanline" aria-hidden="true" />
+      </div>
+    </div>
+  );
+}
+
+function SatelliteNavigatorFallback({ mode }: { mode: GeoVisualMode }) {
+  return (
+    <div
+      className="geo-visual-layer satellite-navigator satellite-navigator-loading"
+      aria-label="Satellite opportunity map"
+      data-satellite-mode={mode}
+      data-tile-status="tiles-loading"
+    >
+      <div className="satellite-mock-canvas" aria-hidden="true" />
+      <div className="satellite-shade" aria-hidden="true" />
+      <div className="satellite-status">
+        <span>{satelliteModeLabel(mode)}</span>
+        <strong>Loading map engine</strong>
+      </div>
+    </div>
+  );
+}
+
+function satelliteModeLabel(mode: GeoVisualMode): string {
+  if (mode === "property_satellite") {
+    return "Street-level satellite";
+  }
+  if (mode === "city_satellite") {
+    return "City satellite";
+  }
+  return "Country satellite";
+}
+
+function aiThinkingStageLabel({
+  globeReady,
+  overviewMarkersReady,
+  overviewRegionReady,
+  overviewSummaryReady,
+}: {
+  globeReady: boolean;
+  overviewMarkersReady: boolean;
+  overviewRegionReady: boolean;
+  overviewSummaryReady: boolean;
+}): string {
+  if (!globeReady) {
+    return "Initializing globe engine";
+  }
+  if (!overviewSummaryReady) {
+    return "Loading country intelligence";
+  }
+  if (!overviewMarkersReady) {
+    return "Projecting opportunity markers";
+  }
+  if (!overviewRegionReady) {
+    return "Preparing regional brief";
+  }
+  return "Preparing regional brief";
+}
+
 function CountryPanel({
   viewMode,
   selectedCountry,
@@ -2214,7 +2291,7 @@ function CountryPanel({
       {!isOverview && packets.length === 0 && packetsLoading && (
         <div className="empty-panel">
           <MapPin size={20} aria-hidden="true" />
-          <strong>Loading candidates</strong>
+          <strong>AI Thinking</strong>
           <span>Map markers are ready while the full evidence packet list loads.</span>
         </div>
       )}
@@ -2534,35 +2611,55 @@ function DetailDossier({
   onSetDetailTab: (tab: "evidence" | "inference" | "review") => void;
 }) {
   const entity = packet.entity;
+  const primaryMetric = primaryMetricEvidence(packet)?.field_value || "Missing primary metric";
+  const sourceCount = evidenceSourceCount(packet);
   return (
-    <section className="dossier">
-      <div className="dossier-head">
-        <h3>{entity.property_name}</h3>
+    <section className="dossier cockpit-dossier">
+      <div className="dossier-hero">
+        <div>
+          <span className="eyebrow">Investment cockpit</span>
+          <h3>{entity.property_name}</h3>
+          <p>{packet.conclusion.reason_to_recommend}</p>
+        </div>
         <a href={entity.google_maps_link || "#"} target="_blank" rel="noreferrer">
           <MapPin size={15} aria-hidden="true" />
           <span>Google Maps</span>
         </a>
       </div>
-      <div className="metric-grid">
-        <Metric
-          label={primaryMetricFilterLabel(entity.scene_type)}
-          value={primaryMetricEvidence(packet)?.field_value || "Missing"}
-        />
+
+      <div className="dossier-cockpit-grid">
+        <article className="primary-metric-card">
+          <span>{primaryMetricFilterLabel(entity.scene_type)}</span>
+          <strong>{primaryMetric}</strong>
+          <small>{sceneLabel(entity.scene_type)}</small>
+        </article>
+        <article className="decision-card">
+          <span>Action Class</span>
+          <strong>{packet.conclusion.action_class}</strong>
+          <small>{packet.conclusion.value_class} · {packet.conclusion.recommended_solution}</small>
+        </article>
+        <article className="decision-card next-action-card">
+          <span>Next Action</span>
+          <strong>{packet.conclusion.next_action}</strong>
+        </article>
+      </div>
+
+      <div className="dossier-status-strip">
+        <DossierStatusPill label="Evidence" value={packet.conclusion.evidence_status} />
+        <DossierStatusPill label="Sources" value={formatNumber(sourceCount)} />
+        <DossierStatusPill label="Review" value={formatNumber(packet.review_queue.length)} />
+        <DossierStatusPill label="Coordinate" value={entity.coordinate_status} />
+        <DossierStatusPill label="Indoor RAT" value={packet.build_status.indoor_rat} />
+      </div>
+
+      <div className="metric-grid network-metric-grid">
         <Metric label="Annual Visits" value={formatNumber(packet.scene.annual_visits_est)} />
+        <Metric label="Busy Users" value={formatNumber(packet.demand?.busy_hour_users)} />
         <Metric label="Busy Traffic GB" value={formatNumber(packet.demand?.busy_hour_traffic_gb)} />
         <Metric label="Bandwidth Mbps" value={formatNumber(packet.demand?.busy_hour_bandwidth_mbps)} />
-        <Metric label="Indoor RAT" value={packet.build_status.indoor_rat} />
-        <Metric label="Coordinate" value={entity.coordinate_status} />
         <Metric label="Map Source" value={entity.map_source || "Unknown"} />
       </div>
-      <div className="record">
-        <span>Reason</span>
-        <p>{packet.conclusion.reason_to_recommend}</p>
-      </div>
-      <div className="record">
-        <span>Next Action</span>
-        <p>{packet.conclusion.next_action}</p>
-      </div>
+
       <div className="tabs">
         {(["evidence", "inference", "review"] as const).map((tab) => (
           <button
@@ -2613,26 +2710,16 @@ function DetailDossier({
           )}
         />
       )}
-      <StreetLevelMap entity={entity} />
     </section>
   );
 }
 
-function StreetLevelMap({ entity }: { entity: Entity }) {
+function DossierStatusPill({ label, value }: { label: string; value: string | number }) {
   return (
-    <section className="street-map" aria-label="Street-level property map">
-      <iframe
-        title={`${entity.property_name} street map`}
-        src={streetMapUrl(entity.latitude, entity.longitude)}
-        loading="lazy"
-      />
-      <div className="street-map-overlay">
-        <strong>{entity.city}</strong>
-        <span>
-          {entity.latitude.toFixed(5)}, {entity.longitude.toFixed(5)}
-        </span>
-      </div>
-    </section>
+    <span className="dossier-status-pill">
+      <small>{label}</small>
+      <strong>{value}</strong>
+    </span>
   );
 }
 
@@ -2668,6 +2755,16 @@ function normalizeRuntimeConfig(config: RuntimeConfig | null | undefined): Runti
       rag: config?.features?.rag ?? DEFAULT_RUNTIME_CONFIG.features.rag,
       connectors: config?.features?.connectors ?? DEFAULT_RUNTIME_CONFIG.features.connectors,
       geocode: config?.features?.geocode ?? DEFAULT_RUNTIME_CONFIG.features.geocode,
+    },
+    map: {
+      satelliteTileTemplate:
+        config?.map?.satelliteTileTemplate || DEFAULT_RUNTIME_CONFIG.map.satelliteTileTemplate,
+      satelliteTileSize:
+        typeof config?.map?.satelliteTileSize === "number" && config.map.satelliteTileSize > 0
+          ? config.map.satelliteTileSize
+          : DEFAULT_RUNTIME_CONFIG.map.satelliteTileSize,
+      satelliteAttribution:
+        config?.map?.satelliteAttribution || DEFAULT_RUNTIME_CONFIG.map.satelliteAttribution,
     },
   };
 }
@@ -2716,7 +2813,7 @@ function configureGlobeControls(globe: GlobeMethods | null, mode: GlobeMode) {
 function aggregateCountryMarkers(
   summaries: CountrySummary[],
   features: MapFeature[],
-  polygons: CountryFeature[],
+  displayPositions: Map<string, { lat: number; lng: number; positionSource: CountryPositionSource }>,
 ): CountryMarker[] {
   type CountryAccumulator = CountryMarker & {
     latTotal: number;
@@ -2774,7 +2871,7 @@ function aggregateCountryMarkers(
             lng: marker.lng,
             positionSource: "property_average" as const,
           }
-        : countryDisplayPosition(marker.country, polygons);
+        : displayPositions.get(marker.country) || defaultCountryDisplayPosition(marker.country);
       return {
         ...marker,
         lat: center.lat,
@@ -2996,6 +3093,221 @@ function deriveViewMode(
   return "overview";
 }
 
+function deriveGeoVisualMode(viewMode: ViewMode): GeoVisualMode {
+  if (viewMode === "property") {
+    return "property_satellite";
+  }
+  if (viewMode === "city") {
+    return "city_satellite";
+  }
+  if (viewMode === "country") {
+    return "country_satellite";
+  }
+  return "globe";
+}
+
+function satelliteCameraForScope({
+  mode,
+  selectedCountry,
+  selectedCityMarker,
+  selectedPacket,
+  cityMarkers,
+  visiblePackets,
+  metricFilteredPackets,
+  features,
+  countryPolygons,
+}: {
+  mode: GeoVisualMode;
+  selectedCountry: string;
+  selectedCityMarker: CityMarker | null;
+  selectedPacket: SitePacket | null;
+  cityMarkers: CityMarker[];
+  visiblePackets: SitePacket[];
+  metricFilteredPackets: SitePacket[];
+  features: MapFeature[];
+  countryPolygons: CountryFeature[];
+}): SatelliteCamera {
+  if (mode === "property_satellite" && selectedPacket && isFiniteCoordinate(selectedPacket.entity)) {
+    return {
+      center: [selectedPacket.entity.longitude, selectedPacket.entity.latitude],
+      zoom: 17,
+      pitch: 60,
+      bearing: -22,
+    };
+  }
+
+  if (mode === "city_satellite") {
+    const bounds = satelliteBoundsFromPackets(visiblePackets);
+    if (bounds) {
+      return cameraFromBounds(bounds, { pitch: 52, bearing: -18, minZoom: 11, maxZoom: 14.5 });
+    }
+    if (selectedCityMarker) {
+      return {
+        center: [selectedCityMarker.lng, selectedCityMarker.lat],
+        zoom: 12.5,
+        pitch: 52,
+        bearing: -18,
+      };
+    }
+  }
+
+  if (mode === "country_satellite") {
+    const cityBounds = satelliteBoundsFromMarkers(
+      cityMarkers.filter((marker) => marker.country === selectedCountry),
+    );
+    const propertyBounds = satelliteBoundsFromPackets(
+      metricFilteredPackets.filter((packet) => packet.entity.country === selectedCountry),
+    );
+    const bounds = cityBounds || propertyBounds;
+    if (bounds) {
+      return cameraFromBounds(bounds, { pitch: 45, bearing: -14, minZoom: 4.4, maxZoom: 7.6 });
+    }
+    const center = countryFocus(selectedCountry, features, countryPolygons);
+    return {
+      center: [center.lng, center.lat],
+      zoom: 5.4,
+      pitch: 45,
+      bearing: -14,
+    };
+  }
+
+  const center = propertyFocus(features);
+  return {
+    center: [center.lng, center.lat],
+    zoom: 2.8,
+    pitch: 0,
+    bearing: 0,
+  };
+}
+
+function satelliteMarkersForScope({
+  mode,
+  selectedCountry,
+  selectedCityKey,
+  selectedPropertyId,
+  selectedPacket,
+  cityMarkers,
+  visiblePackets,
+  metricFilteredPackets,
+}: {
+  mode: GeoVisualMode;
+  selectedCountry: string;
+  selectedCityKey: string;
+  selectedPropertyId: string;
+  selectedPacket: SitePacket | null;
+  cityMarkers: CityMarker[];
+  visiblePackets: SitePacket[];
+  metricFilteredPackets: SitePacket[];
+}): SatelliteMarker[] {
+  if (mode === "country_satellite") {
+    const cities = cityMarkers.filter((marker) => marker.country === selectedCountry);
+    if (cities.length > 0) {
+      return cities.map((marker) => ({
+        id: marker.key,
+        kind: "city",
+        lat: marker.lat,
+        lng: marker.lng,
+        label: marker.city,
+        country: marker.country,
+        city: marker.city,
+        count: marker.candidateCount,
+        selected: marker.key === selectedCityKey,
+        meta: `${formatNumber(marker.candidateCount)} candidates`,
+        candidateCount: marker.candidateCount,
+        sourceCount: marker.sourceCount,
+        reviewCount: marker.reviewCount,
+        scenes: marker.scenes,
+      }));
+    }
+    return [];
+  }
+  if (mode === "city_satellite") {
+    return visiblePackets
+      .filter((packet) => isFiniteCoordinate(packet.entity))
+      .map((packet) => propertySatelliteMarker(packet, selectedPropertyId));
+  }
+  if (mode === "property_satellite" && selectedPacket && isFiniteCoordinate(selectedPacket.entity)) {
+    return [propertySatelliteMarker(selectedPacket, selectedPacket.entity.property_id)];
+  }
+  return [];
+}
+
+function propertySatelliteMarker(packet: SitePacket, selectedPropertyId: string): SatelliteMarker {
+  const sourceCount = new Set(
+    packet.evidence
+      .map((item) => item.source_url || item.source_name)
+      .filter(Boolean),
+  ).size;
+  return {
+    id: packet.entity.property_id,
+    kind: "property",
+    lat: packet.entity.latitude,
+    lng: packet.entity.longitude,
+    label: packet.entity.property_name,
+    country: packet.entity.country,
+    city: packet.entity.city,
+    selected: packet.entity.property_id === selectedPropertyId,
+    meta: sceneLabel(packet.entity.scene_type),
+    candidateCount: 1,
+    sourceCount,
+    reviewCount: packet.review_queue.length,
+    scenes: { [packet.entity.scene_type]: 1 },
+  };
+}
+
+function satelliteBoundsFromPackets(packets: SitePacket[]): SatelliteBounds | null {
+  return boundsFromCoordinates(
+    packets
+      .filter((packet) => isFiniteCoordinate(packet.entity))
+      .map((packet) => ({ lat: packet.entity.latitude, lng: packet.entity.longitude })),
+  );
+}
+
+function satelliteBoundsFromMarkers(markers: CityMarker[]): SatelliteBounds | null {
+  return boundsFromCoordinates(markers.map((marker) => ({ lat: marker.lat, lng: marker.lng })));
+}
+
+function boundsFromCoordinates(points: Array<{ lat: number; lng: number }>): SatelliteBounds | null {
+  const usable = points.filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng));
+  if (usable.length === 0) {
+    return null;
+  }
+  return usable.reduce<SatelliteBounds>(
+    (bounds, point) => ({
+      minLng: Math.min(bounds.minLng, point.lng),
+      minLat: Math.min(bounds.minLat, point.lat),
+      maxLng: Math.max(bounds.maxLng, point.lng),
+      maxLat: Math.max(bounds.maxLat, point.lat),
+    }),
+    {
+      minLng: usable[0].lng,
+      minLat: usable[0].lat,
+      maxLng: usable[0].lng,
+      maxLat: usable[0].lat,
+    },
+  );
+}
+
+function cameraFromBounds(
+  bounds: SatelliteBounds,
+  config: { pitch: number; bearing: number; minZoom: number; maxZoom: number },
+): SatelliteCamera {
+  const lngSpan = Math.max(0.01, Math.abs(bounds.maxLng - bounds.minLng));
+  const latSpan = Math.max(0.01, Math.abs(bounds.maxLat - bounds.minLat));
+  const span = Math.max(lngSpan, latSpan);
+  const zoom = clamp(8.2 - Math.log2(span), config.minZoom, config.maxZoom);
+  return {
+    center: [(bounds.minLng + bounds.maxLng) / 2, (bounds.minLat + bounds.maxLat) / 2],
+    zoom,
+    pitch: config.pitch,
+    bearing: config.bearing,
+  };
+}
+
+function isFiniteCoordinate(entity: Entity): boolean {
+  return Number.isFinite(entity.latitude) && Number.isFinite(entity.longitude);
+}
+
 function summarizeEvidenceGaps(packets: SitePacket[]): EvidenceGapSummary {
   return packets.reduce<EvidenceGapSummary>(
     (summary, packet) => {
@@ -3097,19 +3409,6 @@ function comparePacketsByPrimaryMetricDesc(a: SitePacket, b: SitePacket): number
   return a.entity.city.localeCompare(b.entity.city);
 }
 
-function filterPacketsByPrimaryMetric(
-  packets: SitePacket[],
-  thresholds: Record<string, string>,
-): SitePacket[] {
-  return packets.filter((packet) => {
-    const metricValue = primaryMetricValue(packet);
-    if (metricValue === null) {
-      return false;
-    }
-    return metricValue > metricThresholdForScene(packet.entity.scene_type, thresholds);
-  });
-}
-
 function primaryMetricValue(packet: SitePacket): number | null {
   const metricEvidence = primaryMetricEvidence(packet);
   if (!metricEvidence) {
@@ -3205,22 +3504,6 @@ function metricMultiplier(unit: string): number {
     return 1_000;
   }
   return 1;
-}
-
-function metricThresholdForScene(scene: string, thresholds: Record<string, string>): number {
-  const value = Number(thresholds[scene] ?? DEFAULT_METRIC_THRESHOLD);
-  return Number.isFinite(value) && value >= 0 ? value : 0;
-}
-
-function normalizeThresholdInput(value: string): string {
-  if (!value.trim()) {
-    return "";
-  }
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) {
-    return DEFAULT_METRIC_THRESHOLD;
-  }
-  return String(Math.max(0, parsed));
 }
 
 function primaryMetricFilterLabel(scene: string): string {
@@ -3756,18 +4039,36 @@ function countryDisplayPosition(
   country: string,
   polygons: CountryFeature[],
 ): { lat: number; lng: number; positionSource: CountryPositionSource } {
+  return countryDisplayPositionFromPolygon(
+    country,
+    polygons.find((item) => countryName(item) === country),
+  );
+}
+
+function buildCountryDisplayPositionCache(
+  polygons: CountryFeature[],
+): Map<string, { lat: number; lng: number; positionSource: CountryPositionSource }> {
+  const cache = new Map<string, { lat: number; lng: number; positionSource: CountryPositionSource }>();
+  polygons.forEach((polygon) => {
+    const name = countryName(polygon);
+    if (name) {
+      cache.set(name, countryDisplayPositionFromPolygon(name, polygon));
+    }
+  });
+  return cache;
+}
+
+function countryDisplayPositionFromPolygon(
+  country: string,
+  polygon: CountryFeature | undefined,
+): { lat: number; lng: number; positionSource: CountryPositionSource } {
   const anchor = COUNTRY_DISPLAY_ANCHORS[normalizeCountryName(country)];
-  const polygon = polygons.find((item) => countryName(item) === country);
   if (!polygon) {
-    return anchor
-      ? { ...anchor, positionSource: "display_anchor" }
-      : { lat: 20, lng: 12, positionSource: "default_fallback" };
+    return defaultCountryDisplayPosition(country);
   }
   const points = polygonPoints(polygon.geometry);
   if (points.length === 0) {
-    return anchor
-      ? { ...anchor, positionSource: "display_anchor" }
-      : { lat: 20, lng: 12, positionSource: "default_fallback" };
+    return defaultCountryDisplayPosition(country);
   }
   if (anchor && isTinyCountryPolygon(points)) {
     return { ...anchor, positionSource: "display_anchor" };
@@ -3781,6 +4082,15 @@ function countryDisplayPosition(
     lat: totals.lat / points.length,
     positionSource: "polygon_centroid",
   };
+}
+
+function defaultCountryDisplayPosition(
+  country: string,
+): { lat: number; lng: number; positionSource: CountryPositionSource } {
+  const anchor = COUNTRY_DISPLAY_ANCHORS[normalizeCountryName(country)];
+  return anchor
+    ? { ...anchor, positionSource: "display_anchor" }
+    : { lat: 20, lng: 12, positionSource: "default_fallback" };
 }
 
 function propertyFocus(features: MapFeature[]): { lat: number; lng: number } {
@@ -3826,21 +4136,6 @@ function polygonPoints(geometry: Geometry): [number, number][] {
     return geometry.coordinates.flat(2) as [number, number][];
   }
   return [];
-}
-
-function streetMapUrl(lat: number, lng: number): string {
-  const delta = 0.0032;
-  const params = new URLSearchParams({
-    bbox: [
-      (lng - delta).toFixed(6),
-      (lat - delta).toFixed(6),
-      (lng + delta).toFixed(6),
-      (lat + delta).toFixed(6),
-    ].join(","),
-    layer: "mapnik",
-    marker: `${lat.toFixed(6)},${lng.toFixed(6)}`,
-  });
-  return `https://www.openstreetmap.org/export/embed.html?${params.toString()}`;
 }
 
 function addParam(params: URLSearchParams, key: string, value: string) {

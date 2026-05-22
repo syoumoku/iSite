@@ -52,7 +52,7 @@ QUANTITATIVE_PRIMARY: dict[str, list[str]] = {
     ],
     "stadium": ["seat_count", "event_days", "international_events", "peak_event_capacity"],
     "luxury_hotel_mice": ["keys", "rooms", "meeting_ballroom_area", "ballroom_capacity"],
-    "mall_mixed_use": ["gla", "annual_footfall", "footfall"],
+    "mall_mixed_use": ["gla", "retail_gfa", "annual_footfall", "footfall"],
     "office_government": ["office_nla", "office_gfa"],
     "hospital": ["beds", "outpatient_volume"],
     "university": ["enrollment", "students", "student_count", "campus_population"],
@@ -72,6 +72,7 @@ AREA_FIELDS = {
     "meeting_area",
     "meeting_ballroom_area",
     "gla",
+    "retail_gfa",
     "office_nla",
     "office_gfa",
 }
@@ -807,10 +808,7 @@ def _derive_from_decision(
     source_domain_count = len(source_domains)
     decision_metric = _decision_metric(decision)
 
-    has_hard_primary = (
-        decision.get("metric_availability_level") == HARD_EVIDENCE_LABEL
-        and objective_metric is not None
-    )
+    has_hard_primary = objective_metric is not None
     selected_metric = objective_metric if has_hard_primary else None
     if (
         decision_metric
@@ -823,7 +821,14 @@ def _derive_from_decision(
     gpt_annual = _float_or_none(decision.get("annual_visits_est"))
     proxy_annual = _annual_visits_from_metric(scene_type, selected_metric)
     fallback_annual = proxy_annual.value if proxy_annual is not None else None
-    annual_est = (gpt_annual or fallback_annual or current_annual) if selected_metric else None
+    if not selected_metric:
+        annual_est = None
+    elif selected_metric.field_key in ANNUAL_VISIT_FIELDS:
+        annual_est = gpt_annual or selected_metric.numeric_value
+    elif fallback_annual is not None:
+        annual_est = fallback_annual
+    else:
+        annual_est = gpt_annual or current_annual
     if annual_est is not None and annual_est <= 0:
         annual_est = None
     annual_raw = (
@@ -837,7 +842,7 @@ def _derive_from_decision(
     metric_availability = HARD_EVIDENCE_LABEL if has_hard_primary else LOW_EVIDENCE_LABEL
     capacity_estimate = _float_or_none(decision.get("capacity_estimate"))
     capacity_unit = _clean_optional_text(decision.get("capacity_unit"))
-    if capacity_estimate is None and selected_metric is not None:
+    if selected_metric is not None:
         capacity_estimate = selected_metric.numeric_value
         capacity_unit = selected_metric.numeric_unit
 
@@ -1594,6 +1599,12 @@ def _numeric_value_and_unit(field_key: str, value: str) -> tuple[float | None, s
         area = _area_value(lower)
         if area is not None:
             return area, "sqm"
+    if field_key in DAILY_VISIT_FIELDS:
+        daily_numbers = _period_matched_numbers(lower, DAILY_PERIOD_MARKERS)
+        if daily_numbers:
+            return max(daily_numbers), _unit_for_field(field_key, lower)
+        if any(marker in lower for marker in ANNUAL_PERIOD_MARKERS):
+            return None, None
     numbers = _numbers_with_multipliers(lower)
     if not numbers:
         return None, None
@@ -1604,7 +1615,10 @@ def _numeric_value_and_unit(field_key: str, value: str) -> tuple[float | None, s
 def _area_value(lower: str) -> float | None:
     metric_matches = [
         _parse_number(match.group(1))
-        for match in re.finditer(r"(\d[\d,.]*)\s*(?:sqm|m2|m²|square\s*met(?:er|re)s?)", lower)
+        for match in re.finditer(
+            r"(\d[\d,.\s]*\d|\d)\s*(?:sqm|sq\.?\s*m|m2|m²|square\s*met(?:er|re)s?)",
+            lower,
+        )
     ]
     metric_values = [value for value in metric_matches if value is not None]
     if metric_values:
@@ -1619,7 +1633,45 @@ def _area_value(lower: str) -> float | None:
     return None
 
 
+DAILY_PERIOD_MARKERS = (
+    "/day",
+    "per day",
+    "a day",
+    "daily",
+    "passengers/day",
+    "passenger/day",
+    "riders/day",
+    "visits/day",
+)
+ANNUAL_PERIOD_MARKERS = (
+    "/year",
+    "per year",
+    "a year",
+    "this year",
+    "annually",
+    "annual",
+    "yearly",
+    "passengers/year",
+    "passenger/year",
+    "visits/year",
+)
+
+
+def _period_matched_numbers(lower: str, markers: tuple[str, ...]) -> list[float]:
+    values: list[float] = []
+    for number, raw, context in _numbers_with_context(lower):
+        if _looks_like_year(raw, number):
+            continue
+        if any(marker in context for marker in markers):
+            values.append(number)
+    return values
+
+
 def _numbers_with_multipliers(lower: str) -> list[float]:
+    return [number for number, _, _ in _numbers_with_context(lower)]
+
+
+def _numbers_with_context(lower: str) -> list[tuple[float, str, str]]:
     values = []
     for match in re.finditer(r"\d[\d,.]*", lower):
         number = _parse_number(match.group(0))
@@ -1630,8 +1682,24 @@ def _numbers_with_multipliers(lower: str) -> list[float]:
             number *= 1_000_000_000
         elif "million" in suffix:
             number *= 1_000_000
-        values.append(number)
+        context = _number_clause_context(lower, match.start(), match.end())
+        values.append((number, match.group(0), context))
     return values
+
+
+def _number_clause_context(lower: str, start: int, end: int) -> str:
+    left = max(lower.rfind(delimiter, 0, start) for delimiter in (";", "\n", "."))
+    right_candidates = [
+        position
+        for position in (lower.find(delimiter, end) for delimiter in (";", "\n", "."))
+        if position != -1
+    ]
+    right = min(right_candidates) if right_candidates else len(lower)
+    return lower[left + 1 : right]
+
+
+def _looks_like_year(raw: str, number: float) -> bool:
+    return raw.isdigit() and len(raw) == 4 and 1900 <= number <= 2100
 
 
 def _field_key(row: dict[str, Any]) -> str:
@@ -1658,7 +1726,7 @@ def _unit_for_field(field_key: str, lower: str) -> str | None:
 
 def _parse_number(value: str) -> float | None:
     try:
-        return float(value.replace(",", ""))
+        return float(value.replace(",", "").replace(" ", ""))
     except ValueError:
         return None
 

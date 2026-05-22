@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import threading
 import time
@@ -7,10 +9,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID
 
+import httpx
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 from starlette.staticfiles import StaticFiles
 
 from isite2.connectors import HttpPublicEvidenceProvider
@@ -66,6 +69,25 @@ _UI_DIR = _PROJECT_ROOT / "ui" / "world_map"
 _UI_DIST_DIR = _UI_DIR / "dist"
 _OVERLAY_SYNC_LOCK = threading.Lock()
 _OVERLAY_SYNC_TTL_SECONDS = 300.0
+_DEFAULT_VERSATILES_TILE_TEMPLATE = "https://tiles.versatiles.org/tiles/satellite/{z}/{x}/{y}"
+_DEFAULT_MAPTILER_TILE_TEMPLATE = (
+    "https://api.maptiler.com/tiles/satellite-v2/{z}/{x}/{y}.jpg?key={token}"
+)
+_DEFAULT_MAPTILER_TILE_TOKEN = "rnpOwVToJlpNtgw35V2t"
+_VERSATILES_SATELLITE_ATTRIBUTION = "Source: VersaTiles Satellite"
+_MAPTILER_SATELLITE_ATTRIBUTION = "Source: MapTiler Satellite"
+_SATELLITE_TILE_TTL_SECONDS = 14 * 24 * 60 * 60
+_SATELLITE_TILE_FAILURE_TTL_SECONDS = 5 * 60
+_SATELLITE_TILE_TIMEOUT_SECONDS = 4.0
+_SATELLITE_TILE_BREAKER_TTL_SECONDS = 5 * 60
+_SATELLITE_TILE_BREAKER_THRESHOLD = 3
+_SATELLITE_TILE_FATAL_STATUS_CODES = {401, 403, 429}
+_SATELLITE_TILE_LOCK = threading.Lock()
+_SATELLITE_TILE_BREAKER = {
+    "consecutive_failures": 0,
+    "opened_until": 0.0,
+    "reason": "",
+}
 
 
 @app.middleware("http")
@@ -161,6 +183,11 @@ def runtime_config() -> dict:
     return {
         "mode": app_mode(),
         "features": runtime_features(),
+        "map": {
+            "satelliteTileTemplate": "/map/satellite-tiles/{z}/{y}/{x}",
+            "satelliteTileSize": _satellite_tile_size(),
+            "satelliteAttribution": _satellite_tile_attribution(),
+        },
     }
 
 
@@ -487,6 +514,20 @@ def country_summary(scan_run_id: UUID | None = None) -> list[dict]:
     return _country_summary_rows(scan_run_id=scan_run_id)
 
 
+@app.get("/map/satellite-tiles/{z}/{y}/{x}")
+def satellite_tile(z: int, y: int, x: int) -> Response:
+    _validate_satellite_tile_coordinates(z, y, x)
+    content, content_type = _satellite_tile_from_cache_or_upstream(z, y, x)
+    return Response(
+        content=content,
+        media_type=content_type,
+        headers={
+            "Cache-Control": "public, max-age=604800",
+            "X-iSite2-Tile-Source": "cache-or-upstream",
+        },
+    )
+
+
 @app.get("/map/city-summary")
 def city_summary(
     scan_run_id: UUID | None = None,
@@ -763,6 +804,184 @@ def _clear_ui_caches() -> None:
     # Summary endpoints are recomputed per request because growth/import jobs can
     # update the active DB outside this API process.
     return None
+
+
+class _SatelliteTileUpstreamError(RuntimeError):
+    def __init__(self, message: str, *, status_code: int | None = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+
+
+def _satellite_tile_token() -> str:
+    return os.getenv("ISITE2_SATELLITE_TILE_TOKEN", _DEFAULT_MAPTILER_TILE_TOKEN).strip()
+
+
+def _satellite_tile_template() -> str:
+    configured = os.getenv("ISITE2_SATELLITE_TILE_TEMPLATE", "").strip()
+    if configured:
+        return configured
+    if _satellite_tile_token():
+        return _DEFAULT_MAPTILER_TILE_TEMPLATE
+    return _DEFAULT_VERSATILES_TILE_TEMPLATE
+
+
+def _satellite_tile_size() -> int:
+    raw = os.getenv("ISITE2_SATELLITE_TILE_SIZE", "512").strip()
+    try:
+        value = int(raw)
+    except ValueError:
+        return 512
+    return value if value > 0 else 512
+
+
+def _satellite_tile_attribution() -> str:
+    configured = os.getenv("ISITE2_SATELLITE_TILE_ATTRIBUTION", "").strip()
+    if configured:
+        return configured
+    template = _satellite_tile_template().casefold()
+    if "maptiler" in template:
+        return _MAPTILER_SATELLITE_ATTRIBUTION
+    if "versatiles" in template:
+        return _VERSATILES_SATELLITE_ATTRIBUTION
+    return "Source: configured satellite imagery provider"
+
+
+def _satellite_tile_url(z: int, y: int, x: int) -> str:
+    return _satellite_tile_template().format(
+        z=z,
+        y=y,
+        x=x,
+        token=_satellite_tile_token(),
+    )
+
+
+def _satellite_tile_cache_dir() -> Path:
+    return Path(
+        os.getenv(
+            "ISITE2_TILE_CACHE_DIR",
+            str(_PROJECT_ROOT / ".tmp" / "isite2_tile_cache"),
+        )
+    )
+
+
+def _validate_satellite_tile_coordinates(z: int, y: int, x: int) -> None:
+    if z < 0 or z > 18:
+        raise HTTPException(status_code=400, detail="satellite tile zoom must be between 0 and 18")
+    max_index = (2**z) - 1
+    if x < 0 or y < 0 or x > max_index or y > max_index:
+        raise HTTPException(status_code=400, detail="satellite tile x/y is outside zoom bounds")
+
+
+def _satellite_tile_cache_paths(z: int, y: int, x: int) -> tuple[Path, Path, Path]:
+    cache_source = f"{_satellite_tile_template()}|tileSize={_satellite_tile_size()}"
+    template_hash = hashlib.sha256(cache_source.encode("utf-8")).hexdigest()[:16]
+    base = _satellite_tile_cache_dir() / template_hash / str(z) / str(y)
+    return base / f"{x}.tile", base / f"{x}.json", base / f"{x}.fail"
+
+
+def _satellite_tile_from_cache_or_upstream(z: int, y: int, x: int) -> tuple[bytes, str]:
+    tile_path, meta_path, fail_path = _satellite_tile_cache_paths(z, y, x)
+    now = time.time()
+
+    if tile_path.exists() and now - tile_path.stat().st_mtime <= _SATELLITE_TILE_TTL_SECONDS:
+        return tile_path.read_bytes(), _satellite_tile_content_type(meta_path)
+
+    if fail_path.exists() and now - fail_path.stat().st_mtime <= _SATELLITE_TILE_FAILURE_TTL_SECONDS:
+        raise HTTPException(status_code=502, detail="satellite tile upstream recently failed")
+
+    breaker_reason = _satellite_tile_breaker_reason(now)
+    if breaker_reason:
+        raise HTTPException(
+            status_code=503,
+            detail=f"satellite tile upstream breaker open: {breaker_reason}",
+        )
+
+    url = _satellite_tile_url(z, y, x)
+    try:
+        content, content_type = _fetch_satellite_tile_from_upstream(url)
+    except Exception as exc:  # noqa: BLE001 - convert transport errors into a stable tile response
+        fail_path.parent.mkdir(parents=True, exist_ok=True)
+        fail_path.write_text(str(exc), encoding="utf-8")
+        _record_satellite_tile_failure(exc)
+        raise HTTPException(status_code=502, detail="satellite tile upstream failed") from exc
+
+    _record_satellite_tile_success()
+    tile_path.parent.mkdir(parents=True, exist_ok=True)
+    tile_path.write_bytes(content)
+    meta_path.write_text(json.dumps({"content_type": content_type}), encoding="utf-8")
+    if fail_path.exists():
+        fail_path.unlink()
+    return content, content_type
+
+
+def _satellite_tile_content_type(meta_path: Path) -> str:
+    if not meta_path.exists():
+        return "image/jpeg"
+    try:
+        value = json.loads(meta_path.read_text(encoding="utf-8")).get("content_type")
+    except json.JSONDecodeError:
+        return "image/jpeg"
+    return value if isinstance(value, str) and value.startswith("image/") else "image/jpeg"
+
+
+def _fetch_satellite_tile_from_upstream(url: str) -> tuple[bytes, str]:
+    headers = {
+        "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+        "User-Agent": "iSite2/0.1 satellite-tile-cache",
+    }
+    with httpx.Client(follow_redirects=True, timeout=_SATELLITE_TILE_TIMEOUT_SECONDS) as client:
+        response = client.get(url, headers=headers)
+    content_type = response.headers.get("content-type", "").split(";")[0].strip().lower()
+    if response.status_code != 200 or not response.content or not content_type.startswith("image/"):
+        raise _SatelliteTileUpstreamError(
+            f"upstream tile failed with status={response.status_code} content_type={content_type or 'unknown'}",
+            status_code=response.status_code,
+        )
+    return response.content, content_type
+
+
+def _satellite_tile_breaker_reason(now: float | None = None) -> str | None:
+    current_time = now if now is not None else time.time()
+    with _SATELLITE_TILE_LOCK:
+        opened_until = float(_SATELLITE_TILE_BREAKER["opened_until"])
+        if opened_until > current_time:
+            return str(_SATELLITE_TILE_BREAKER["reason"])
+        if opened_until:
+            _reset_satellite_tile_breaker_locked()
+        return None
+
+
+def _record_satellite_tile_success() -> None:
+    with _SATELLITE_TILE_LOCK:
+        _reset_satellite_tile_breaker_locked()
+
+
+def _record_satellite_tile_failure(exc: Exception) -> None:
+    status_code = exc.status_code if isinstance(exc, _SatelliteTileUpstreamError) else None
+    should_open_immediately = status_code in _SATELLITE_TILE_FATAL_STATUS_CODES
+    should_count = status_code is None or status_code >= 500 or should_open_immediately
+    if not should_count:
+        return
+
+    with _SATELLITE_TILE_LOCK:
+        failures = int(_SATELLITE_TILE_BREAKER["consecutive_failures"]) + 1
+        _SATELLITE_TILE_BREAKER["consecutive_failures"] = failures
+        if should_open_immediately or failures >= _SATELLITE_TILE_BREAKER_THRESHOLD:
+            _SATELLITE_TILE_BREAKER["opened_until"] = time.time() + _SATELLITE_TILE_BREAKER_TTL_SECONDS
+            _SATELLITE_TILE_BREAKER["reason"] = (
+                f"status {status_code}" if status_code is not None else "transport failure"
+            )
+
+
+def _reset_satellite_tile_breaker() -> None:
+    with _SATELLITE_TILE_LOCK:
+        _reset_satellite_tile_breaker_locked()
+
+
+def _reset_satellite_tile_breaker_locked() -> None:
+    _SATELLITE_TILE_BREAKER["consecutive_failures"] = 0
+    _SATELLITE_TILE_BREAKER["opened_until"] = 0.0
+    _SATELLITE_TILE_BREAKER["reason"] = ""
 
 
 def _registry_backed_countries(regions: list[str], source_registry: dict) -> list[str]:

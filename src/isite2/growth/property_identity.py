@@ -198,11 +198,44 @@ class KnownOpportunityIndex:
         return KnownOpportunityMatch(status=NEW_OPPORTUNITY, confidence=0.0)
 
     def _replace_record(self, record: KnownOpportunityRecord) -> None:
+        old_record = self._by_identity.get(record.identity.identity_key)
         self._records = [
             record if item.identity.identity_key == record.identity.identity_key else item
             for item in self._records
         ]
-        self._rebuild()
+        if old_record is not None:
+            self._remove_record_indexes(old_record)
+        self._index_record(record)
+
+    def _remove_record_indexes(self, record: KnownOpportunityRecord) -> None:
+        identity = record.identity
+        name_key = (
+            identity.normalized_country,
+            identity.normalized_scene_type,
+            identity.normalized_name,
+        )
+        if name_key in self._by_country_scene_name:
+            self._by_country_scene_name[name_key] = [
+                item
+                for item in self._by_country_scene_name[name_key]
+                if item.identity.identity_key != identity.identity_key
+            ]
+            if not self._by_country_scene_name[name_key]:
+                del self._by_country_scene_name[name_key]
+        if identity.coordinate_bucket:
+            coordinate_key = (
+                identity.normalized_country,
+                identity.normalized_scene_type,
+                identity.coordinate_bucket,
+            )
+            if coordinate_key in self._by_coordinate_bucket:
+                self._by_coordinate_bucket[coordinate_key] = [
+                    item
+                    for item in self._by_coordinate_bucket[coordinate_key]
+                    if item.identity.identity_key != identity.identity_key
+                ]
+                if not self._by_coordinate_bucket[coordinate_key]:
+                    del self._by_coordinate_bucket[coordinate_key]
 
     def _rebuild(self) -> None:
         records = list(self._records)

@@ -79,6 +79,8 @@ COUNTRY_QIDS = {
     "Cambodia": "Q424",
     "Maldives": "Q826",
     "Turkey": "Q43",
+    "Philippines": "Q928",
+    "Saudi Arabia": "Q851",
 }
 
 HOTEL_ALLOW = re.compile(

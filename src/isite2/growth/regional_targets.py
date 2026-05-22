@@ -42,9 +42,11 @@ ASIA_PACIFIC_COUNTRIES = [
     "Sri Lanka",
     "Cambodia",
     "Maldives",
+    "Philippines",
 ]
 
 EMEA_COUNTRIES = [
+    "Saudi Arabia",
     "Turkey",
 ]
 

@@ -61,6 +61,36 @@ class OverconfidentGatewayProvider(FakeGptDerivedProvider):
         return decision
 
 
+class OfficeCapacityConfusionProvider(FakeGptDerivedProvider):
+    def derive(self, packet: dict) -> dict:
+        decision = super().derive(packet)
+        decision["selected_primary_metric"] = {
+            "field_group": "office_gfa",
+            "field_value": "office_gfa: Gross leasable area: 41,000 sqm",
+            "numeric_value": 41_000,
+            "unit": "sqm",
+        }
+        decision["annual_visits_est"] = 410_000
+        decision["capacity_estimate"] = 4_100
+        decision["capacity_unit"] = "persons"
+        return decision
+
+
+class TransportAnnualConfusionProvider(FakeGptDerivedProvider):
+    def derive(self, packet: dict) -> dict:
+        decision = super().derive(packet)
+        decision["selected_primary_metric"] = {
+            "field_group": "daily_ridership",
+            "field_value": "Daily passenger traffic: 180,000 passengers/day",
+            "numeric_value": 180_000,
+            "unit": "visits/day",
+        }
+        decision["annual_visits_est"] = 21_900_000_000
+        decision["capacity_estimate"] = 60_000_000
+        decision["capacity_unit"] = "visits/day"
+        return decision
+
+
 class VersionedFakeGptProvider(FakeGptDerivedProvider):
     def __init__(self, annual_visits: int = 12_000_000) -> None:
         super().__init__()
@@ -143,6 +173,24 @@ def test_gpt_refresh_downgrades_gateway_role_to_low_evidence(tmp_path) -> None:
     )
 
 
+def test_gpt_capacity_estimate_cannot_override_objective_area_metric(tmp_path) -> None:
+    repository = _repository_with_office(tmp_path)
+    result = repository.list()[0]
+
+    refresh_active_derived_info(
+        repository.engine,
+        scan_run_id=str(result.scan_run.run_id),
+        provider=OfficeCapacityConfusionProvider(),
+        cache_dir=None,
+    )
+    refreshed = repository.list_properties({"scan_run_id": result.scan_run.run_id})[0]
+
+    assert refreshed.scene.metric_availability_level == HARD_EVIDENCE_LABEL
+    assert refreshed.scene.area_metric_name == "Office Gfa"
+    assert refreshed.scene.area_metric_value == 41_000
+    assert refreshed.scene.area_metric_unit == "sqm"
+
+
 def test_rule_refresh_derives_proxy_visits_and_busy_hour_trace_from_primary_metric(
     tmp_path,
 ) -> None:
@@ -170,6 +218,25 @@ def test_rule_refresh_derives_proxy_visits_and_busy_hour_trace_from_primary_metr
     assert "busy_hour_users = daily_visits x attach_rate" in (
         inference_by_field["busy_hour_traffic_gb"].inference_chain
     )
+
+
+def test_daily_ridership_prefers_daily_value_over_annual_projection(tmp_path) -> None:
+    repository = _repository_with_transport_hub(tmp_path)
+    result = repository.list()[0]
+
+    refresh_active_derived_info(
+        repository.engine,
+        scan_run_id=str(result.scan_run.run_id),
+        provider=TransportAnnualConfusionProvider(),
+        cache_dir=None,
+    )
+    refreshed = repository.list_properties({"scan_run_id": result.scan_run.run_id})[0]
+
+    assert refreshed.scene.metric_availability_level == HARD_EVIDENCE_LABEL
+    assert refreshed.scene.area_metric_name == "Daily Ridership"
+    assert refreshed.scene.area_metric_value == 180_000
+    assert refreshed.scene.area_metric_unit == "visits/day"
+    assert refreshed.scene.annual_visits_est == 65_700_000
 
 
 def test_unchanged_evidence_package_reuses_db_decision_without_gpt_call(tmp_path) -> None:
@@ -288,6 +355,44 @@ def _repository_with_stadium_capacity(tmp_path) -> SQLAlchemyScanRunRepository:
     return repository
 
 
+def _repository_with_office(tmp_path) -> SQLAlchemyScanRunRepository:
+    repository = SQLAlchemyScanRunRepository.from_url(
+        f"sqlite+pysqlite:///{tmp_path / 'isite2_office.db'}",
+        storage_mode="sqlite",
+    )
+    run_scan_pipeline(
+        {
+            "level": "country",
+            "countries": ["Philippines"],
+            "full_scan": True,
+            "scene_types": ["office_government"],
+            "output_formats": ["geojson"],
+        },
+        repository,
+        source_registry=_single_office_registry(),
+    )
+    return repository
+
+
+def _repository_with_transport_hub(tmp_path) -> SQLAlchemyScanRunRepository:
+    repository = SQLAlchemyScanRunRepository.from_url(
+        f"sqlite+pysqlite:///{tmp_path / 'isite2_transport.db'}",
+        storage_mode="sqlite",
+    )
+    run_scan_pipeline(
+        {
+            "level": "country",
+            "countries": ["Philippines"],
+            "full_scan": True,
+            "scene_types": ["transport_hub"],
+            "output_formats": ["geojson"],
+        },
+        repository,
+        source_registry=_single_transport_hub_registry(),
+    )
+    return repository
+
+
 def _single_airport_registry() -> dict:
     return {
         "countries": {
@@ -329,6 +434,111 @@ def _single_airport_registry() -> dict:
                                 "source_name": "Example Airport Authority",
                                 "source_tier": "Tier 1",
                                 "source_url": "https://example.org/cairo-airport-traffic",
+                                "source_date": "2026",
+                                "evidence_type": "Direct",
+                            }
+                        ],
+                    }
+                ],
+            }
+        }
+    }
+
+
+def _single_transport_hub_registry() -> dict:
+    return {
+        "countries": {
+            "Philippines": {
+                "aliases": ["Philippines"],
+                "bbox": {
+                    "min_latitude": 4.5,
+                    "max_latitude": 21.5,
+                    "min_longitude": 116.0,
+                    "max_longitude": 127.0,
+                },
+                "candidates": [
+                    {
+                        "property_name": "Parañaque Integrated Terminal Exchange",
+                        "city": "Parañaque",
+                        "scene_type": "transport_hub",
+                        "coordinate": {
+                            "latitude": 14.5099,
+                            "longitude": 120.9913,
+                            "geocode_precision": "landport terminal centroid",
+                            "map_source": "test registry",
+                            "map_source_date": "2026-05-22",
+                            "coordinate_status": "Verified",
+                        },
+                        "hero_image": {
+                            "url": "https://example.org/pitx.jpg",
+                            "alt_text": "PITX terminal",
+                            "source_name": "Example Image",
+                            "source_url": "https://example.org/pitx-image",
+                            "source_date": "2026",
+                        },
+                        "discovery_source": "test_registry",
+                        "evidence": [
+                            {
+                                "field_group": "daily_ridership",
+                                "indicator_name": "daily_ridership",
+                                "field_value": (
+                                    "Daily passenger traffic: 180,000 passengers/day; "
+                                    "projected 55 million to 60 million passengers/year"
+                                ),
+                                "source_name": "Example Transport Report",
+                                "source_tier": "Tier 2",
+                                "source_url": "https://example.org/pitx-traffic",
+                                "source_date": "2026-03-12",
+                                "evidence_type": "Direct",
+                            }
+                        ],
+                    }
+                ],
+            }
+        }
+    }
+
+
+def _single_office_registry() -> dict:
+    return {
+        "countries": {
+            "Philippines": {
+                "aliases": ["Philippines"],
+                "bbox": {
+                    "min_latitude": 4.5,
+                    "max_latitude": 21.5,
+                    "min_longitude": 116.0,
+                    "max_longitude": 127.0,
+                },
+                "candidates": [
+                    {
+                        "property_name": "GT Tower",
+                        "city": "Makati",
+                        "scene_type": "office_government",
+                        "coordinate": {
+                            "latitude": 14.5599,
+                            "longitude": 121.0170,
+                            "geocode_precision": "office tower centroid",
+                            "map_source": "test registry",
+                            "map_source_date": "2026-05-22",
+                            "coordinate_status": "Verified",
+                        },
+                        "hero_image": {
+                            "url": "https://example.org/gt-tower.jpg",
+                            "alt_text": "GT Tower",
+                            "source_name": "Example Image",
+                            "source_url": "https://example.org/gt-tower-image",
+                            "source_date": "2026",
+                        },
+                        "discovery_source": "test_registry",
+                        "evidence": [
+                            {
+                                "field_group": "office_gfa",
+                                "indicator_name": "office_gfa",
+                                "field_value": "office_gfa: Gross leasable area: 41, 000 sq m",
+                                "source_name": "Example Office Directory",
+                                "source_tier": "Tier 2",
+                                "source_url": "https://example.org/gt-tower",
                                 "source_date": "2026",
                                 "evidence_type": "Direct",
                             }

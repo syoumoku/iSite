@@ -58,3 +58,10 @@ GeoJSON Feature properties 至少包含：
 - Click property opens drawer.
 - Export selected scan run to Excel.
 - Generate PPT insight cards for selected scan run.
+
+## 卫星影像源
+
+- 浏览器侧只访问本域 `/map/satellite-tiles/{z}/{y}/{x}`，不得在前端直写第三方 tile URL 或暴露 token。
+- 后端内置默认 MapTiler Satellite v2 key；配置 `ISITE2_SATELLITE_TILE_TOKEN` 后会覆盖内置 key。
+- 可用 `ISITE2_SATELLITE_TILE_TEMPLATE` 覆盖上游模板，例如切回 VersaTiles；`ISITE2_SATELLITE_TILE_TOKEN` 会在服务端替换 `{token}`，`ISITE2_SATELLITE_TILE_SIZE` 默认 `512`。
+- tile proxy 必须保留本地缓存、短期失败缓存和全局失败熔断，避免不可用影像源拖慢国家/物业工作台展开。

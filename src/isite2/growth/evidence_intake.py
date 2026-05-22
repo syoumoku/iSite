@@ -372,15 +372,18 @@ def _merge_candidate_evidence(
         ):
             continue
         existing_evidence = candidate.setdefault("evidence", [])
-        existing_keys = {
-            _evidence_key(evidence)
-            for evidence in existing_evidence
+        existing_by_key = {
+            _evidence_key(evidence): index
+            for index, evidence in enumerate(existing_evidence)
         }
         for evidence in incoming.get("evidence", []):
             evidence_key = _evidence_key(evidence)
-            if evidence_key not in existing_keys:
+            existing_index = existing_by_key.get(evidence_key)
+            if existing_index is None:
                 existing_evidence.append(evidence)
-                existing_keys.add(evidence_key)
+                existing_by_key[evidence_key] = len(existing_evidence) - 1
+            elif existing_evidence[existing_index] != evidence:
+                existing_evidence[existing_index] = evidence
         return
 
 

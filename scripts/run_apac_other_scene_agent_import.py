@@ -10,6 +10,8 @@ from typing import Any
 from isite2.growth.evidence_curation import run_pending_evidence_curation
 from isite2.growth.evidence_intake import (
     CandidateDraft,
+    candidate_key,
+    candidate_keys,
     load_effective_source_registry,
     validate_candidate_draft,
 )
@@ -59,6 +61,7 @@ def main() -> None:
             parsed.extend(_load_candidates(path))
 
     registry = load_effective_source_registry() if parsed else {}
+    existing_keys = candidate_keys(registry) if parsed else set()
     store = EvidenceCurationStore(database_url=args.db_url) if parsed else None
     known_index = (
         known_opportunity_index_from_registry(
@@ -120,7 +123,8 @@ def main() -> None:
             longitude=draft.longitude,
             source_url=draft.source_url,
         )
-        if identity_match.status != NEW_OPPORTUNITY:
+        key = candidate_key(draft.country, draft.city, draft.property_name, draft.scene_type)
+        if identity_match.status != NEW_OPPORTUNITY and key not in existing_keys:
             skipped[f"identity_{identity_match.status}"] += 1
             rejected.append(_reject(item, identity_match.reason or identity_match.status))
             continue
@@ -223,6 +227,24 @@ def _metric(item: dict[str, Any]) -> tuple[str, str] | None:
         if any(token in text for token in ("largest", "flagship")):
             return "flagship_position", "flagship_position"
     if scene == "office_government":
+        if any(
+            token in text
+            for token in (
+                "office_gfa",
+                "gross floor area",
+                "built-up area",
+                "built up area",
+                "building area",
+                "bua",
+                "sqm",
+                "sq m",
+                "m2",
+                "m²",
+                "square meter",
+                "square metre",
+            )
+        ):
+            return "office_gfa", "office_gfa"
         if "floor" in text:
             return "floor_count", "floor_count"
         if "height" in text or " m" in text:
@@ -299,8 +321,8 @@ def _draft(
         latitude=float(item["latitude"]),
         longitude=float(item["longitude"]),
         geocode_precision=_geocode_precision(item),
-        map_source="Firecrawl agent sourced public coordinate",
-        map_source_date=source_date,
+        map_source=str(item.get("map_source") or "Firecrawl agent sourced public coordinate"),
+        map_source_date=str(item.get("map_source_date") or source_date),
         field_group=field_group,
         indicator_name=indicator_name,
         field_value=f"{name}: {value}",

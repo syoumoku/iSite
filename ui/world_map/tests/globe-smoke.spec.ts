@@ -49,6 +49,23 @@ const PACKETS = COUNTRIES.flatMap((country) =>
 const DENSE_PACKETS = PACKETS.concat(
   DENSE_ALGERIA_PLACES.map((place, index) => createPacket(place, SCENES[index % SCENES.length], 0)),
 );
+const DENSE_ALGIERS_PROPERTY_PACKETS = Array.from({ length: 12 }, (_, index) => {
+  const row = Math.floor(index / 4);
+  const column = index % 4;
+  const packet = createPacket(
+    {
+      country: "Algeria",
+      city: "Algiers",
+      lat: 36.723 + row * 0.004,
+      lng: 3.044 + column * 0.004,
+    },
+    SCENES[index % SCENES.length],
+    index,
+  );
+  packet.entity.property_id = `algiers-dense-property-${index + 1}`;
+  packet.entity.property_name = `Algiers dense property ${index + 1}`;
+  return packet;
+});
 const APAC_PACKETS = APAC_PLACES.map((place, index) =>
   createPacket(place, SCENES[index % SCENES.length], 0),
 );
@@ -59,13 +76,118 @@ test("renders the opportunity globe as the default product surface", async ({ pa
   await installMockApi(page, { dataRequests, scanRunRequests });
 
   await page.goto("/ui/?mock_globe=1", { waitUntil: "domcontentloaded" });
+  await expect(page.locator(".app-shell")).toHaveAttribute("data-view-mode", "overview");
   await expect(page.locator(".globe-stage")).toBeVisible();
+  await expect(page.locator(".satellite-navigator")).toHaveCount(0);
   await expect(page.locator(".agent-workbench-stage")).toHaveCount(0);
   await expect(page.getByRole("tab", { name: "Agent workbench view" })).toHaveCount(0);
   await expect(page.getByRole("tab", { name: "Globe view" })).toHaveCount(0);
   await expectGlobeMarkerCount(page, 2);
   await expect(page.locator(".insight-panel")).toBeVisible();
   expect(scanRunRequests).toEqual([]);
+});
+
+test("shows AI Thinking during delayed overview bootstrap and defers discovery status", async ({ page }) => {
+  const dataRequests: string[] = [];
+  const discoveryRequests: string[] = [];
+  await installMockApi(page, {
+    dataRequests,
+    discoveryRequests,
+    countrySummaryDelayMs: 900,
+    discoveryDelayMs: 3_000,
+  });
+
+  await page.goto("/ui/?mock_globe=1&mock_cluster=1", { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("status")).toContainText("AI Thinking");
+  await expect(page.getByRole("status")).toContainText("Loading country intelligence");
+  expect(discoveryRequests).toEqual([]);
+
+  await expectGlobeMarkerCount(page, 2, 10_000);
+  await expect(page.getByLabel("Region distribution")).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: "AI Thinking" })).toHaveCount(0);
+  await expect.poll(() => requestCount(dataRequests, "/map/country-summary")).toBe(1);
+  await expect.poll(() => discoveryRequests.length, { timeout: 5_000 }).toBeGreaterThan(0);
+});
+
+test("promotes a selected country into the workspace layout", async ({ page }) => {
+  const dataRequests: string[] = [];
+  await installMockApi(page, { dataRequests });
+
+  await page.goto("/ui/?mock_globe=1&mock_cluster=1&mock_satellite=1", { waitUntil: "domcontentloaded" });
+  await page.getByRole("button", { name: /Algeria, 9 candidate properties/ }).click();
+
+  await expect(page.locator(".app-shell")).toHaveAttribute("data-view-mode", "country");
+  await expect(page.locator(".satellite-navigator")).toBeVisible();
+  await expect(page.locator(".satellite-navigator")).toHaveAttribute("data-satellite-mode", "country_satellite");
+  await expect(page.locator(".workspace-context-bar")).toBeVisible();
+  await expect(page.getByLabel("Evidence gaps")).toBeVisible();
+  await expect(page.getByLabel("Scene distribution")).toBeVisible();
+  await expectPropertyCardCount(page, 9);
+
+  const widths = await page.evaluate(() => {
+    const globe = document.querySelector(".globe-stage")?.getBoundingClientRect().width || 0;
+    const panel = document.querySelector(".insight-panel")?.getBoundingClientRect().width || 0;
+    return { globe, panel };
+  });
+  if ((page.viewportSize()?.width || 0) >= 920) {
+    expect(widths.panel).toBeGreaterThan(widths.globe);
+  } else {
+    expect(widths.panel).toBeGreaterThanOrEqual(widths.globe);
+  }
+  await expect(page.getByRole("button", { name: "Expand map" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Collapse map" })).toHaveCount(0);
+});
+
+test("shows satellite markers before the country property payload finishes", async ({ page }) => {
+  const dataRequests: string[] = [];
+  const consoleErrors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") {
+      consoleErrors.push(message.text());
+    }
+  });
+  await installMockApi(page, { dataRequests, propertyDelayMs: 3_000 });
+
+  await page.goto("/ui/", { waitUntil: "domcontentloaded" });
+  await expect
+    .poll(() => page.evaluate(() => {
+      const appWindow = window as typeof window & {
+        __isite2SelectCountry?: (country: string) => void;
+      };
+      return Boolean(appWindow.__isite2SelectCountry);
+    }), { timeout: 30_000 })
+    .toBe(true);
+  await expect.poll(() => requestCount(dataRequests, "/map/country-summary")).toBe(1);
+
+  await page.evaluate(() => {
+    const appWindow = window as typeof window & {
+      __isite2SelectCountry?: (country: string) => void;
+    };
+    appWindow.__isite2SelectCountry?.("Algeria");
+  });
+
+  await expect(page.locator(".satellite-navigator")).toHaveAttribute("data-satellite-mode", "country_satellite");
+  await expect(page.locator(".satellite-navigator")).toHaveAttribute("data-tile-status", /tiles-loading|tiles-ready/);
+  await expect
+    .poll(() => page.evaluate(() => document.querySelectorAll(".satellite-marker").length), { timeout: 1_000 })
+    .toBeGreaterThan(0);
+  expect(requestCount(dataRequests, "/map/country-summary")).toBe(1);
+
+  await expectPropertyCardCount(page, 9, 6_000);
+  await page.evaluate(() => {
+    (window as typeof window & { __satelliteNode?: Element | null }).__satelliteNode =
+      document.querySelector(".satellite-navigator");
+  });
+  await clickFirstPropertyCard(page);
+  await expect(page.locator(".satellite-navigator")).toHaveAttribute("data-satellite-mode", "property_satellite");
+  await expect(page.locator(".street-map")).toHaveCount(0);
+  await expect
+    .poll(() => page.evaluate(() => {
+      const appWindow = window as typeof window & { __satelliteNode?: Element | null };
+      return appWindow.__satelliteNode === document.querySelector(".satellite-navigator");
+    }))
+    .toBe(true);
+  expect(consoleErrors.filter((line) => line.includes("Access-Control-Allow-Origin"))).toEqual([]);
 });
 
 test("public view hides write and connector entrypoints", async ({ page }) => {
@@ -138,41 +260,22 @@ test("groups newly scanned APAC countries in the overview region distribution", 
   });
 });
 
-test("filters property cards by the selected scene primary metric threshold", async ({ page }) => {
+test("keeps only the country selector under the left visual stage", async ({ page }) => {
   const dataRequests: string[] = [];
-  const metricPackets = [
-    withPrimaryEvidence(
-      createPacket(PLACES[0], "luxury_hotel_mice", 0),
-      "room_count",
-      "40 rooms",
-    ),
-    withPrimaryEvidence(
-      createPacket(PLACES[1], "luxury_hotel_mice", 1),
-      "room_count",
-      "75 rooms",
-    ),
-    withPrimaryEvidence(
-      createPacket(CITY_ONLY_PLACE, "stadium", 0),
-      "seat_count",
-      "18,000 seats",
-    ),
-  ];
-  await installMockApi(page, { dataRequests, packets: metricPackets });
+  await installMockApi(page, { dataRequests });
 
   await page.goto("/ui/?mock_globe=1", { waitUntil: "domcontentloaded" });
-  await expect(page.getByRole("button", { name: /Algeria, 3 candidate properties/ })).toBeVisible();
-  await page.getByRole("button", { name: /Algeria, 3 candidate properties/ }).click();
-  await expect(page.locator(".panel-head h2")).toContainText("Algeria", { timeout: 10_000 });
-  await expectPropertyCardCount(page, 3);
+  const stage = page.locator(".globe-stage");
 
-  await page.locator(".filter-strip select").first().selectOption("luxury_hotel_mice");
-  await expectPropertyCardCount(page, 2);
-  await expect(page.getByLabel("Rooms minimum")).toHaveValue("0");
-
-  await page.getByLabel("Rooms minimum").fill("50");
-  await expectPropertyCardCount(page, 1);
-  await expect(page.locator(".property-card")).toContainText("Oran luxury hotel mice");
-  await expect(page.locator(".property-card")).not.toContainText("Algiers luxury hotel mice");
+  await expectGlobeMarkerCount(page, 2);
+  await expect(stage.locator(".filter-strip")).toHaveCount(0);
+  await expect(stage.getByText("All scenes", { exact: true })).toHaveCount(0);
+  await expect(stage.getByText("All evidence", { exact: true })).toHaveCount(0);
+  await expect(stage.getByText("All actions", { exact: true })).toHaveCount(0);
+  await expect(stage.getByText("Primary metric", { exact: true })).toHaveCount(0);
+  await expect(stage.getByText("Review", { exact: true })).toHaveCount(0);
+  await expect(stage.getByRole("region", { name: "Country scope" })).toBeVisible();
+  await expect(stage.getByRole("button", { name: /Country scope:/ })).toBeVisible();
 });
 
 test("shows airport objective primary metric instead of gateway role on property cards", async ({ page }) => {
@@ -231,7 +334,7 @@ test("filters the right panel from scene distribution and sorts by primary metri
   await expect(page.locator(".panel-head h2")).toContainText("Algeria", { timeout: 10_000 });
   await expectPropertyCardCount(page, 4);
   await expectGlobeMarkerCount(page, 3);
-  await expect(page.locator(".filter-strip select").first()).toHaveValue("");
+  await expect(page.locator(".globe-stage .filter-strip")).toHaveCount(0);
   const requestCountAfterLoad = dataRequests.length;
 
   const sceneDistribution = page.getByLabel("Scene distribution");
@@ -240,7 +343,7 @@ test("filters the right panel from scene distribution and sorts by primary metri
 
   await expect(hotelScene).toHaveAttribute("aria-pressed", "true");
   await expectPropertyCardCount(page, 3);
-  await expect(page.locator(".filter-strip select").first()).toHaveValue("");
+  await expect(page.locator(".globe-stage .filter-strip")).toHaveCount(0);
   await expectGlobeMarkerCount(page, 3);
   await expect.poll(async () => propertyCardTitles(page)).toEqual([
     "Oran luxury hotel mice",
@@ -254,6 +357,44 @@ test("filters the right panel from scene distribution and sorts by primary metri
   await hotelScene.click();
   await expect(hotelScene).toHaveAttribute("aria-pressed", "false");
   await expectPropertyCardCount(page, 4);
+});
+
+test("switches the workspace list to dense rows and opens a property detail surface", async ({ page }) => {
+  const dataRequests: string[] = [];
+  const densePackets = [
+    createPacket(PLACES[0], "stadium", 0),
+    createPacket(PLACES[1], "stadium", 1),
+    createPacket(PLACES[0], "mall_mixed_use", 0),
+  ];
+  await installMockApi(page, { dataRequests, packets: densePackets });
+
+  await page.goto("/ui/?mock_globe=1&mock_cluster=1&mock_satellite=1", { waitUntil: "domcontentloaded" });
+  await page.getByRole("button", { name: /Algeria, 3 candidate properties/ }).click();
+  const sceneDistribution = page.getByLabel("Scene distribution");
+  const stadiumScene = sceneDistribution.getByRole("button", { name: /Stadium/ });
+  await stadiumScene.click();
+
+  await page.getByRole("button", { name: "Dense view" }).click();
+  await expect(page.locator(".dense-property-list")).toBeVisible();
+  await expect(page.locator(".dense-property-row")).toHaveCount(2);
+  await expect(page.locator(".dense-property-row").first()).toContainText("stadium");
+  await expect(page.locator(".dense-property-row").first()).toContainText("seats");
+  await expect(page.locator(".dense-property-row").first()).toContainText("1");
+
+  await page.locator(".dense-property-row").first().click();
+  await expect(page.locator(".app-shell")).toHaveAttribute("data-view-mode", "property");
+  await expect(page.locator(".satellite-navigator")).toHaveAttribute("data-satellite-mode", "property_satellite");
+  await expect(page.locator(".dossier")).toBeVisible();
+  await expect(page.locator(".cockpit-dossier")).toBeVisible();
+  await expect(page.locator(".street-map")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "evidence" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "inference" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "review" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Back to list" }).click();
+  await expect(page.locator(".app-shell")).toHaveAttribute("data-view-mode", "country");
+  await expect(stadiumScene).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".dense-property-row")).toHaveCount(2);
 });
 
 test("requests the global candidate pool for the opportunity globe", async ({ page }) => {
@@ -312,19 +453,21 @@ test("requests the global candidate pool for the opportunity globe", async ({ pa
   await expectGlobeMode(page, "focused");
 
   await expect(page.getByRole("button", { name: /Algiers, Algeria, 4 candidate properties/ }))
-    .toHaveAttribute("title", /3 mapped/);
+    .toHaveAttribute("title", /city satellite marker/);
   await expect(page.getByRole("button", { name: /Setif, Algeria, 1 candidate properties/ }))
-    .toHaveAttribute("title", /estimated city position/);
+    .toHaveAttribute("title", /city satellite marker/);
 
-  await page.getByRole("button", { name: /Algiers, Algeria/ }).click();
+  await page.getByRole("button", { name: /Algiers, Algeria/ }).click({ force: true });
   await expect(page.locator(".panel-head h2")).toContainText("Algiers", { timeout: 10_000 });
   await expectPropertyCardCount(page, 4);
-  await expectGlobeMarkerCount(page, 3);
+  await expectGlobeMarkerCount(page, 4);
   await expectGlobeMode(page, "focused");
 
   await clickFirstPropertyCard(page);
   await expect(page.locator(".dossier")).toBeVisible();
-  await expect(page.locator(".street-map")).toBeVisible();
+  await expect(page.locator(".cockpit-dossier")).toBeVisible();
+  await expect(page.locator(".street-map")).toHaveCount(0);
+  await expect(page.locator(".satellite-navigator")).toHaveAttribute("data-satellite-mode", "property_satellite");
   await expectPropertyCardCount(page, 0);
   await expectGlobeMode(page, "focused");
 
@@ -351,7 +494,7 @@ test("requests the global candidate pool for the opportunity globe", async ({ pa
   await expectPropertyCardCount(page, 9);
   await expectGlobeMarkerCount(page, 3);
 
-  await page.getByRole("button", { name: /Setif, Algeria/ }).click();
+  await page.getByRole("button", { name: /Setif, Algeria/ }).click({ force: true });
   await expect(page.locator(".panel-head h2")).toContainText("Setif", { timeout: 10_000 });
   await expectPropertyCardCount(page, 1);
   await page.getByRole("button", { name: "Export PPT" }).click();
@@ -361,7 +504,7 @@ test("requests the global candidate pool for the opportunity globe", async ({ pa
     body: { country: "Algeria", city: "Setif" },
   });
 
-  await page.getByRole("button", { name: /Country scope: Algeria/ }).click();
+  await page.getByRole("button", { name: /Country scope: Algeria/ }).click({ force: true });
   await page.evaluate(() => {
     const appWindow = window as typeof window & {
       __isite2SelectCountry?: (country: string) => void;
@@ -427,7 +570,7 @@ test("hides globe markers after they rotate behind the earth", async ({ page }) 
   expect(consoleErrors.filter((line) => !isIgnorableConsoleError(line))).toEqual([]);
 });
 
-test("clusters dense country city markers and spider-expands them", async ({ page }) => {
+test("shows dense country city markers in the satellite navigator", async ({ page }) => {
   const consoleErrors: string[] = [];
   const pageErrors: string[] = [];
   page.on("console", (message) => {
@@ -463,29 +606,48 @@ test("clusters dense country city markers and spider-expands them", async ({ pag
   });
   expect(selectedCountry).toBe(true);
   await expect(page.locator(".panel-head h2")).toContainText("Algeria", { timeout: 20_000 });
-
-  const clusterButton = page.getByRole("button", { name: /clustered cities in Algeria/i }).first();
-  await expect(clusterButton).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator(".satellite-navigator")).toHaveAttribute("data-satellite-mode", "country_satellite");
   await expect
-    .poll(() => visibleRealClusterMarkerCount(page), { timeout: 20_000 })
+    .poll(() => page.evaluate(() => document.querySelectorAll('[data-satellite-marker-kind="city_cluster"]').length), { timeout: 20_000 })
     .toBeGreaterThan(0);
-  await expect(
-    page.locator(".marker-overlay-layer").getByRole("button", { name: /Bir Mourad Rais, Algeria/ }),
-  ).toHaveCount(0);
-
+  const clusteredState = await page.evaluate(() => {
+    const labels = Array.from(document.querySelectorAll<HTMLElement>(".satellite-marker-label"))
+      .map((element) => element.childNodes[0]?.textContent?.trim() || "");
+    return {
+      cityCount: document.querySelectorAll('[data-satellite-marker-kind="city"]').length,
+      clusterCount: document.querySelectorAll('[data-satellite-marker-kind="city_cluster"]').length,
+      propertyCount: document.querySelectorAll('[data-satellite-marker-kind="property"]').length,
+      markerCount: document.querySelectorAll(".satellite-marker").length,
+      labels,
+      title: document.querySelector('[data-satellite-marker-kind="city_cluster"]')?.getAttribute("title") || "",
+    };
+  });
+  expect(clusteredState.propertyCount).toBe(0);
+  expect(clusteredState.clusterCount).toBeGreaterThan(0);
+  expect(clusteredState.markerCount).toBeLessThan(DENSE_ALGERIA_PLACES.length);
+  expect(clusteredState.labels.every((label) => !label.includes(", Algeria"))).toBe(true);
+  expect(clusteredState.title).toContain("Algeria");
   const expandedCluster = await page.evaluate(() => {
-    const cluster = document.querySelector<HTMLButtonElement>(".marker-overlay-layer .cluster-marker");
-    if (cluster) {
-      window.setTimeout(() => cluster.click(), 0);
-    }
+    const cluster = document.querySelector<HTMLButtonElement>('[data-satellite-marker-kind="city_cluster"]');
+    cluster?.click();
     return Boolean(cluster);
   });
   expect(expandedCluster).toBe(true);
   await expect
-    .poll(() => visibleSpiderChildCount(page), { timeout: 20_000 })
+    .poll(() => page.locator(".satellite-navigator").getAttribute("data-expanded-satellite-cluster"))
+    .toContain("satellite_city_cluster::");
+  const spideredCluster = await page.evaluate(() => {
+    const cluster = document.querySelector<HTMLButtonElement>('[data-satellite-marker-kind="city_cluster"].active')
+      || document.querySelector<HTMLButtonElement>('[data-satellite-marker-kind="city_cluster"]');
+    cluster?.click();
+    return Boolean(cluster);
+  });
+  expect(spideredCluster).toBe(true);
+  await expect
+    .poll(() => page.evaluate(() => document.querySelectorAll(".satellite-marker.spider-child").length), { timeout: 20_000 })
     .toBeGreaterThan(1);
   const selectedCity = await page.evaluate(() => {
-    const city = Array.from(document.querySelectorAll<HTMLButtonElement>(".marker-overlay-layer .spider-child"))
+    const city = Array.from(document.querySelectorAll<HTMLButtonElement>(".satellite-marker"))
       .find((button) => button.getAttribute("aria-label")?.includes("Bir Mourad Rais, Algeria"));
     if (city) {
       window.setTimeout(() => city.click(), 0);
@@ -506,10 +668,109 @@ test("clusters dense country city markers and spider-expands them", async ({ pag
   expect(consoleErrors.filter((line) => !isIgnorableConsoleError(line))).toEqual([]);
 });
 
+test("clusters dense city property markers in the satellite navigator", async ({ page }) => {
+  const consoleErrors: string[] = [];
+  const pageErrors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") {
+      consoleErrors.push(message.text());
+    }
+  });
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  const dataRequests: string[] = [];
+  await installMockApi(page, {
+    dataRequests,
+    packets: DENSE_ALGIERS_PROPERTY_PACKETS,
+  });
+
+  await page.goto("/ui/?mock_globe=1&mock_cluster=1&mock_satellite=1", { waitUntil: "domcontentloaded" });
+  await expect
+    .poll(() => page.evaluate(() => {
+      const appWindow = window as typeof window & {
+        __isite2SelectCountry?: (country: string) => void;
+      };
+      appWindow.__isite2SelectCountry?.("Algeria");
+      return Boolean(appWindow.__isite2SelectCountry);
+    }), { timeout: 60_000 })
+    .toBe(true);
+  await expect(page.locator(".satellite-navigator")).toHaveAttribute("data-satellite-mode", "country_satellite");
+  const selectedCity = await page.evaluate(() => {
+    const city = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-satellite-marker-kind="city"]'))
+      .find((button) => button.getAttribute("aria-label")?.includes("Algiers, Algeria"));
+    city?.click();
+    return Boolean(city);
+  });
+  expect(selectedCity).toBe(true);
+  await expect(page.locator(".panel-head h2")).toContainText("Algiers", { timeout: 20_000 });
+  await expect(page.locator(".satellite-navigator")).toHaveAttribute("data-satellite-mode", "city_satellite");
+  await expect
+    .poll(() => page.evaluate(() => document.querySelectorAll('[data-satellite-marker-kind="property_cluster"]').length), { timeout: 20_000 })
+    .toBeGreaterThan(0);
+
+  const clusteredState = await page.evaluate(() => ({
+    clusterCount: document.querySelectorAll('[data-satellite-marker-kind="property_cluster"]').length,
+    propertyCount: document.querySelectorAll('[data-satellite-marker-kind="property"]').length,
+    markerCount: document.querySelectorAll(".satellite-marker").length,
+    title: document.querySelector('[data-satellite-marker-kind="property_cluster"]')?.getAttribute("title") || "",
+  }));
+  expect(clusteredState.clusterCount).toBeGreaterThan(0);
+  expect(clusteredState.markerCount).toBeLessThan(DENSE_ALGIERS_PROPERTY_PACKETS.length);
+  expect(clusteredState.title).toContain("property cluster satellite marker");
+
+  const expandedCluster = await page.evaluate(() => {
+    const cluster = document.querySelector<HTMLButtonElement>('[data-satellite-marker-kind="property_cluster"]');
+    cluster?.click();
+    return Boolean(cluster);
+  });
+  expect(expandedCluster).toBe(true);
+  await expect
+    .poll(() => page.locator(".satellite-navigator").getAttribute("data-expanded-satellite-cluster"))
+    .toContain("satellite_property_cluster::");
+
+  const spideredCluster = await page.evaluate(() => {
+    const cluster = document.querySelector<HTMLButtonElement>('[data-satellite-marker-kind="property_cluster"].active')
+      || document.querySelector<HTMLButtonElement>('[data-satellite-marker-kind="property_cluster"]');
+    cluster?.click();
+    return Boolean(cluster);
+  });
+  expect(spideredCluster).toBe(true);
+  await expect
+    .poll(() => page.evaluate(() => document.querySelectorAll(".satellite-marker.spider-child").length), { timeout: 20_000 })
+    .toBeGreaterThan(1);
+
+  const singleMarkerState = await page.evaluate(() => {
+    const marker = document.querySelector<HTMLElement>('[data-satellite-marker-kind="property"].spider-child');
+    return {
+      coreText: marker?.querySelector(".satellite-marker-core")?.textContent?.trim() || "",
+      ariaLabel: marker?.getAttribute("aria-label") || "",
+      title: marker?.getAttribute("title") || "",
+    };
+  });
+  expect(singleMarkerState.coreText).not.toBe("1");
+  expect(singleMarkerState.ariaLabel).toContain("Algiers dense property");
+  expect(singleMarkerState.title).toContain("property satellite marker");
+
+  const selectedProperty = await page.evaluate(() => {
+    const property = document.querySelector<HTMLButtonElement>('[data-satellite-marker-kind="property"].spider-child');
+    property?.click();
+    return Boolean(property);
+  });
+  expect(selectedProperty).toBe(true);
+  await expect(page.locator(".satellite-navigator")).toHaveAttribute("data-satellite-mode", "property_satellite");
+  await expect(page.locator(".dossier-hero h3")).toContainText("Algiers dense property", { timeout: 20_000 });
+
+  expect(pageErrors).toEqual([]);
+  expect(consoleErrors.filter((line) => !isIgnorableConsoleError(line))).toEqual([]);
+});
+
 async function expectDataRequestCount(dataRequests: string[], expectedMinimum: number) {
   await expect
     .poll(() => dataRequests.length, { timeout: 30_000 })
     .toBeGreaterThanOrEqual(expectedMinimum);
+}
+
+function requestCount(requests: string[], pathname: string) {
+  return requests.filter((request) => new URL(request).pathname === pathname).length;
 }
 
 async function expectPropertyCardCount(page: Page, expected: number, timeout = 10_000) {
@@ -529,7 +790,9 @@ function propertyCardTitles(page: Page) {
 
 async function expectGlobeMarkerCount(page: Page, expected: number, timeout = 10_000) {
   await expect
-    .poll(() => page.evaluate(() => document.querySelectorAll(".city-marker").length), {
+    .poll(() => page.evaluate(() =>
+      document.querySelectorAll(".city-marker, .satellite-marker").length
+    ), {
       timeout,
     })
     .toBe(expected);
@@ -637,6 +900,7 @@ type MockApiOptions = {
   scanRunRequests?: string[];
   exportRequests?: Array<{ path: string; body: Record<string, unknown> }>;
   ragRequests?: Array<{ path: string; body: Record<string, unknown> }>;
+  discoveryRequests?: string[];
   runtimeConfig?: {
     mode: string;
     features: {
@@ -645,7 +909,15 @@ type MockApiOptions = {
       connectors: boolean;
       geocode: boolean;
     };
+    map?: {
+      satelliteTileTemplate: string;
+      satelliteTileSize?: number;
+      satelliteAttribution: string;
+    };
   };
+  countrySummaryDelayMs?: number;
+  discoveryDelayMs?: number;
+  propertyDelayMs?: number;
   packets?: Array<ReturnType<typeof createPacket>>;
 };
 
@@ -655,6 +927,7 @@ async function installMockApi(page: Page, {
   scanRunRequests = [],
   exportRequests = [],
   ragRequests = [],
+  discoveryRequests = [],
   runtimeConfig = {
     mode: "local",
     features: {
@@ -663,7 +936,15 @@ async function installMockApi(page: Page, {
       connectors: true,
       geocode: true,
     },
+    map: {
+      satelliteTileTemplate: "/map/satellite-tiles/{z}/{y}/{x}",
+      satelliteTileSize: 512,
+      satelliteAttribution: "Mock satellite attribution",
+    },
   },
+  countrySummaryDelayMs = 0,
+  discoveryDelayMs = 0,
+  propertyDelayMs = 0,
   packets = PACKETS,
 }: MockApiOptions) {
   let apiPackets = [...packets];
@@ -679,12 +960,20 @@ async function installMockApi(page: Page, {
   await page.route((url) => url.pathname === "/runtime-config", (route) =>
     route.fulfill({ json: runtimeConfig }),
   );
+  await page.route((url) => url.pathname.startsWith("/map/satellite-tiles/"), async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 3_000));
+    return route.fulfill({ body: EMPTY_PNG, contentType: "image/png" });
+  });
   await page.route((url) => url.pathname === "/scan-runs", (route) => {
     scanRunRequests.push(route.request().url());
     return route.fulfill({ json: [scanRun(RUN_ID, apiPackets.length), scanRun(SECOND_RUN_ID, apiPackets.length)] });
   });
-  await page.route((url) => url.pathname === "/discovery/status", (route) =>
-    route.fulfill({
+  await page.route((url) => url.pathname === "/discovery/status", async (route) => {
+    discoveryRequests.push(route.request().url());
+    if (discoveryDelayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, discoveryDelayMs));
+    }
+    return route.fulfill({
       json: {
         task_backlog: { queued: 6, leased: 1, completed: 8 },
         progress_status: { active: 3, blocked_review: 1 },
@@ -708,8 +997,8 @@ async function installMockApi(page: Page, {
           errors: [],
         },
       },
-    }),
-  );
+    });
+  });
   await page.route((url) => url.pathname === "/raw-evidence", (route) => {
     const packets = filteredPackets(route.request().url(), apiPackets);
     return route.fulfill({
@@ -751,8 +1040,11 @@ async function installMockApi(page: Page, {
       },
     });
   });
-  await page.route((url) => url.pathname === "/map/country-summary", (route) => {
+  await page.route((url) => url.pathname === "/map/country-summary", async (route) => {
     dataRequests.push(route.request().url());
+    if (countrySummaryDelayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, countrySummaryDelayMs));
+    }
     return route.fulfill({ json: countrySummaries(apiPackets) });
   });
   await page.route((url) => url.pathname === "/map/city-summary", (route) => {
@@ -773,6 +1065,20 @@ async function installMockApi(page: Page, {
   await page.route((url) => url.pathname === "/properties", (route) => {
     dataRequests.push(route.request().url());
     const packets = filteredPackets(route.request().url(), apiPackets);
+    const fulfill = () => route.fulfill({
+      json: {
+        candidate_count: packets.length,
+        display_count: packets.length,
+        packets,
+      },
+    });
+    if (propertyDelayMs > 0) {
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          void fulfill().then(resolve);
+        }, propertyDelayMs);
+      });
+    }
     return route.fulfill({
       json: {
         candidate_count: packets.length,

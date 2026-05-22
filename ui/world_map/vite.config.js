@@ -7,5 +7,14 @@ export default defineConfig({
         outDir: "dist",
         emptyOutDir: true,
         sourcemap: false,
+        rollupOptions: {
+            output: {
+                manualChunks: function (id) {
+                    if (id.indexOf("maplibre-gl") >= 0 || id.indexOf("@maplibre") >= 0) {
+                        return "satellite-map";
+                    }
+                },
+            },
+        },
     },
 });

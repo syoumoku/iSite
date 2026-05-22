@@ -80,6 +80,7 @@ COUNTRY_QIDS = {
     "Cambodia": "Q424",
     "Maldives": "Q826",
     "Turkey": "Q43",
+    "Philippines": "Q928",
 }
 
 OFFICE_ALLOW = re.compile(

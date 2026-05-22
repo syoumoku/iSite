@@ -166,6 +166,42 @@ def test_existing_url_with_changed_source_date_triggers_candidate_update(tmp_pat
     assert second.updated_count == 1
 
 
+def test_existing_url_with_changed_value_replaces_overlay_evidence(tmp_path) -> None:
+    store = EvidenceCurationStore(database_url=f"sqlite+pysqlite:///{tmp_path / 'evidence.db'}")
+    overlay_path = tmp_path / "overlay.yaml"
+    draft_path = tmp_path / "drafts.json"
+    draft = _draft(source_url="https://example.org/changed-value")
+
+    store.upsert_candidate_evidence(draft)
+    run_pending_evidence_curation(
+        store=store,
+        output_dir=tmp_path / "loop",
+        overlay_path=overlay_path,
+        draft_path=draft_path,
+    )
+    changed = store.upsert_candidate_evidence(
+        _draft(
+            source_url="https://example.org/changed-value",
+            field_value="Annual public footfall is now verified as 2,500,000 visitors.",
+        )
+    )
+    second = run_pending_evidence_curation(
+        store=store,
+        output_dir=tmp_path / "loop",
+        overlay_path=overlay_path,
+        draft_path=draft_path,
+    )
+
+    overlay = load_registry_overlay(overlay_path)
+    evidence = overlay["countries"]["Nigeria"]["candidates"][0]["evidence"]
+
+    assert changed.is_changed_evidence is True
+    assert second is not None
+    assert second.updated_count == 1
+    assert len(evidence) == 1
+    assert evidence[0]["field_value"] == "Annual public footfall is now verified as 2,500,000 visitors."
+
+
 def test_identity_variant_updates_existing_candidate_without_new_overlay_row(tmp_path) -> None:
     store = EvidenceCurationStore(database_url=f"sqlite+pysqlite:///{tmp_path / 'evidence.db'}")
     overlay_path = tmp_path / "overlay.yaml"

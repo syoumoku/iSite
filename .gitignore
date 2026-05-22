@@ -18,3 +18,4 @@ test-results/
 ui/world_map/test-results/
 .secrets/
 {}
+.codex/config.toml

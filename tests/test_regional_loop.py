@@ -39,8 +39,8 @@ def test_default_regions_cover_africa_and_latin_america_country_lists() -> None:
 def test_asia_pacific_region_includes_initial_scan_batch_countries() -> None:
     countries = countries_for_regions(["Asia Pacific"])
 
-    assert ASIA_PACIFIC_COUNTRIES == ["Sri Lanka", "Cambodia", "Maldives"]
-    assert countries == ["Sri Lanka", "Cambodia", "Maldives"]
+    assert ASIA_PACIFIC_COUNTRIES == ["Sri Lanka", "Cambodia", "Maldives", "Philippines"]
+    assert countries == ["Sri Lanka", "Cambodia", "Maldives", "Philippines"]
 
 
 def test_registry_backed_counts_include_only_objective_seeded_countries() -> None:

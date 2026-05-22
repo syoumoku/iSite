@@ -171,6 +171,10 @@ country_profiles:
     languages: ["es", "en"]
     official_source_terms: ["estadísticas", "memoria anual", "informe oficial", "gobierno"]
     preferred_domains: [".gob.pe", ".gov.pe", ".pe"]
+  Philippines:
+    languages: ["en", "tl"]
+    official_source_terms: ["official", "annual report", "statistics", "authority", "ulat", "gobyerno"]
+    preferred_domains: [".gov.ph", ".ph", ".com.ph"]
   Rwanda:
     languages: ["en", "fr"]
     official_source_terms: ["official", "statistics", "annual report", "rapport annuel"]
