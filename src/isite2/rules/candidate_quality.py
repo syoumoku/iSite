@@ -55,6 +55,11 @@ def evaluate_packet_quality(packet: SitePacket) -> CandidateQualityResult:
         evidence_assumption_notes=evidence_assumption_notes,
         annual_visits_est=packet.scene.annual_visits_est,
         scene_assumption_note=packet.scene.assumption_note,
+        city_assignment_status=(
+            packet.entity.city_assignment.mapping_status
+            if packet.entity.city_assignment is not None
+            else None
+        ),
         require_surface_assets=True,
     )
 
@@ -65,6 +70,34 @@ def apply_candidate_quality(packet: SitePacket) -> CandidateQualityResult:
     packet.visibility = result.visibility
     packet.quality_issues = list(result.issues)
     return result
+
+
+def apply_designated_lead_primary_metric_exception(
+    packet: SitePacket,
+    result: CandidateQualityResult,
+) -> CandidateQualityResult:
+    """Expose a user-designated lead when its only defect is a missing primary metric."""
+    if result.status != BLOCKED_QUALITY or not result.issues:
+        return result
+    if not all(_is_missing_primary_metric_issue(issue) for issue in result.issues):
+        return result
+
+    exception = CandidateQualityResult(
+        status=REVIEW_REQUIRED,
+        issues=list(result.issues),
+        visibility=CandidateVisibility(
+            raw_pool=True,
+            review_required=True,
+            main_table_ready=True,
+            map_ready=True,
+            export_ready=True,
+        ),
+        blocking_surfaces=[],
+    )
+    packet.candidate_quality_status = exception.status
+    packet.visibility = exception.visibility
+    packet.quality_issues = list(exception.issues)
+    return exception
 
 
 def evaluate_candidate_quality(
@@ -84,6 +117,7 @@ def evaluate_candidate_quality(
     evidence_assumption_notes: list[str] | None = None,
     annual_visits_est: float | None = None,
     scene_assumption_note: str | None = None,
+    city_assignment_status: str | None = None,
     require_surface_assets: bool = False,
     config: dict | None = None,
 ) -> CandidateQualityResult:
@@ -152,8 +186,8 @@ def evaluate_candidate_quality(
             issues.append(geocode_issue)
 
     if require_surface_assets:
-        if not _is_http_url(hero_image_url):
-            issues.append("hero_image missing or invalid for UI map surface")
+        if city_assignment_status is not None and city_assignment_status != "verified":
+            issues.append("city assignment is not verified")
         objective_issue = validate_scene_objective_evidence(
             scene_type=scene_type,
             evidence_field_groups=evidence_field_groups,
@@ -510,7 +544,8 @@ def candidate_quality_review_item(
         reason=f"候选质量门阻断：{issue_text}",
         next_action=(
             f"核验 {entity.country}/{entity.city} 的 {entity.property_name} 是否为具体物业点；"
-            "补齐公开物业图片、场景主指标证据、来源链接、日期和地图坐标；"
+            "补齐场景主指标证据、来源链接、日期和地图坐标；"
+            "公开物业图片优先补齐，坏图用 Firecrawl 搜图换源，确实无图不阻断；"
             "若无物业级证据则移出候选池。"
         ),
         review_type="candidate_quality",
@@ -557,6 +592,10 @@ def normalize_text(value: str | None) -> str:
     text = re.sub(r"[^a-z0-9\s.-]+", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
     return text
+
+
+def _is_missing_primary_metric_issue(issue: str) -> bool:
+    return normalize_text(issue).startswith("scene objective evidence metric missing")
 
 
 def _wiki_slug(url: str) -> str | None:

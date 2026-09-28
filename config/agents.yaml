@@ -54,4 +54,4 @@ agents:
     name: QA Agent
     input: all_outputs
     output: review_queue,qa_report
-    responsibility: Validate gates, field completeness, inference, output consistency.
+    responsibility: Read docs/15_qa_lessons_learned.md first, then validate gates, field completeness, inference, output consistency, and append new recurring-risk issues to the lessons document.

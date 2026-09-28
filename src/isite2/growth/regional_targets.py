@@ -43,6 +43,36 @@ ASIA_PACIFIC_COUNTRIES = [
     "Cambodia",
     "Maldives",
     "Philippines",
+    "Vietnam",
+    "Indonesia",
+    "Thailand",
+]
+
+# Business-defined sweep cluster for the user's North Africa portfolio scope.
+# It intentionally includes West/Central Africa markets beyond geographic North Africa.
+NORTH_AFRICA_COUNTRIES = [
+    "Egypt",
+    "Ethiopia",
+    "Algeria",
+    "Morocco",
+    "Cameroon",
+    "Senegal",
+    "Cote d'Ivoire",
+    "Congo",
+    "Mali",
+    "Burkina Faso",
+    "Guinea",
+    "Gambia",
+    "Mauritania",
+    "Libya",
+    "Tunisia",
+    "Democratic Republic of the Congo",
+    "Gabon",
+    "Chad",
+    "Equatorial Guinea",
+    "Central African Republic",
+    "Cape Verde",
+    "Benin",
 ]
 
 EMEA_COUNTRIES = [
@@ -52,6 +82,7 @@ EMEA_COUNTRIES = [
 
 REGION_COUNTRIES = {
     "Africa": AFRICAN_COUNTRIES,
+    "North Africa": NORTH_AFRICA_COUNTRIES,
     "Latin America": LATIN_AMERICA_COUNTRIES,
     "Asia Pacific": ASIA_PACIFIC_COUNTRIES,
     "EMEA": EMEA_COUNTRIES,

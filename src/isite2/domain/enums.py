@@ -38,6 +38,7 @@ class EvidenceType(StrEnum):
     DIRECT = "Direct"
     PROXY = "Proxy"
     INFERRED = "Inferred"
+    CONTEXT = "Context"
 
 
 class CrossCheckStatus(StrEnum):

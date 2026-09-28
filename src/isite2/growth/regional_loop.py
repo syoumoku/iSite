@@ -27,11 +27,12 @@ from isite2.growth.regional_targets import (
     ASIA_PACIFIC_COUNTRIES,
     DEFAULT_REGIONS,
     LATIN_AMERICA_COUNTRIES,
+    NORTH_AFRICA_COUNTRIES,
     REGION_COUNTRIES,
     countries_for_regions,
 )
 from isite2.orchestrator.pipeline import run_scan_pipeline
-from isite2.output.excel import write_excel_skeleton
+from isite2.output.excel import _select_main_evidence, write_excel_skeleton
 from isite2.repositories import get_default_repository
 from isite2.repositories.interfaces import ScanRunRepository
 
@@ -43,6 +44,7 @@ __all__ = [
     "DEFAULT_REGIONS",
     "ASIA_PACIFIC_COUNTRIES",
     "LATIN_AMERICA_COUNTRIES",
+    "NORTH_AFRICA_COUNTRIES",
     "countries_for_regions",
     "registry_backed_country_counts",
     "run_regional_scan_round",
@@ -682,7 +684,7 @@ def _round_summary(
 ) -> dict[str, Any]:
     packets = []
     for packet in result.packets:
-        first_evidence = packet.evidence[0] if packet.evidence else None
+        main_evidence = _select_main_evidence(packet)
         packets.append(
             {
                 "property_id": str(packet.entity.property_id),
@@ -691,7 +693,7 @@ def _round_summary(
                 "city": packet.entity.city,
                 "scene_type": packet.entity.scene_type,
                 "coordinate_status": packet.entity.coordinate_status,
-                "main_metric": first_evidence.field_value if first_evidence else "",
+                "main_metric": main_evidence.field_value if main_evidence else "",
                 "source_count": len({str(evidence.source_url) for evidence in packet.evidence}),
                 "evidence_status": str(packet.conclusion.evidence_status),
                 "value_class": str(packet.conclusion.value_class),

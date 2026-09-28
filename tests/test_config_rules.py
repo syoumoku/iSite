@@ -1,18 +1,19 @@
+from isite2.growth.firecrawl_search_strategy import (
+    build_firecrawl_queries,
+    build_gap_closure_queries,
+)
 from isite2.rules.config_loader import (
     load_discovery_sources,
     load_firecrawl_search_strategy,
     load_free_structured_sources,
     load_gate_rules,
     load_localized_search_strategy,
+    load_localization_config,
     load_output_template,
     load_scene_rules,
     load_source_registry,
     load_status_enums,
     validate_output_template_contract,
-)
-from isite2.growth.firecrawl_search_strategy import (
-    build_firecrawl_queries,
-    build_gap_closure_queries,
 )
 from isite2.rules.demand import demand_params_from_scene_rule
 from isite2.rules.reason import make_google_maps_link
@@ -24,10 +25,90 @@ def test_scene_rules_and_output_template_load() -> None:
     output_template = load_output_template()
 
     assert "airport_terminal" in scene_rules["scenes"]
-    assert output_template["excel"]["main_columns"][-1] == "Google地图链接"
+    assert "Google地图链接" in output_template["excel"]["main_columns"]
+    main_columns = output_template["excel"]["main_columns"]
+    assert main_columns.index("主指标量化值") == main_columns.index("物业点重要证据") + 1
     assert "sorting_rules" in output_template["excel"]
     assert "年访问量" in output_template["excel"]["sorting_rules"]["main_table"]
+    assert "主指标量化值" in output_template["excel"]["sorting_rules"]["main_table"]
+    assert "右侧" in output_template["excel"]["sorting_rules"]["main_table"]
+    recommendation_rules = output_template["excel"]["recommendation_rules"]
+    assert (
+        recommendation_rules["default_gate_mode"]
+        == "scene_fixed_first_class_threshold"
+    )
+    assert recommendation_rules["metric_identity_gpt"]["applies_to_all_scenes"] is True
+    assert (
+        "ISITE2_RECOMMENDATION_METRIC_GPT"
+        in recommendation_rules["metric_identity_gpt"]["enabled_env"]
+    )
+    assert recommendation_rules["metric_identity_gpt"]["provider_env"].startswith(
+        "ISITE2_RECOMMENDATION_METRIC_GPT_PROVIDER"
+    )
+    assert "codex-oauth" in recommendation_rules["metric_identity_gpt"]["provider_env"]
+    assert recommendation_rules["default_scene_gates"]["airport_terminal"]["value"] == 2_000_000
+    assert recommendation_rules["default_scene_gates"]["convention_center"]["value"] == 25_000
+    assert recommendation_rules["default_scene_gates"]["transport_hub"]["metric_keys"] == [
+        "line_count"
+    ]
+    assert recommendation_rules["default_scene_gates"]["office_government"]["metric_keys"] == [
+        "tower_height"
+    ]
+    assert recommendation_rules["default_scene_gates"]["office_government"]["value"] == 150
+    assert recommendation_rules["default_scene_gates"]["university"] == {
+        "metric_keys": ["enrollment"],
+        "operator": ">=",
+        "value": 20_000,
+        "threshold_text_zh": "单一实体校园在校生人数 >= 20,000 人",
+        "threshold_text_en": "Single-campus enrollment >= 20,000",
+    }
+    mosque_rule = scene_rules["scenes"]["mosque"]
+    assert mosque_rule["label_zh"] == "清真寺"
+    assert mosque_rule["primary_indicators"][:3] == [
+        "mosque_area",
+        "gross_floor_area",
+        "prayer_hall_area",
+    ]
+    assert "annual_visitors" in mosque_rule["primary_indicators"]
+    assert recommendation_rules["default_scene_gates"]["mosque"]["metric_keys"] == [
+        "mosque_area",
+        "gross_floor_area",
+        "prayer_hall_area",
+        "site_area",
+        "built_up_area",
+    ]
+    ppt_template = output_template["report_bundle"]["ppt"]
+    post_audit = output_template["report_bundle"]["post_output_audit"]
+    assert post_audit["required"] is True
+    assert post_audit["script"] == "scripts/qa_standard_report_output_bundle.py"
+    assert post_audit["gpt_provider"] == "codex-oauth"
+    assert "不得打包" in post_audit["rule"]
+    assert "候选点总数和推荐点总数" in ppt_template["slide_2"]
+    assert "不展示推荐门槛文字" in ppt_template["slide_2"]
+    assert "放大" in ppt_template["typography_rule"]
+    assert "是否被推荐=yes" in ppt_template["recommendation_total_rule"]
+    assert "docs/15_qa_lessons_learned.md" in output_template["report_bundle"]["preflight_qa"]
     assert validate_output_template_contract(output_template) == []
+
+
+def test_localization_config_covers_core_labels() -> None:
+    localization = load_localization_config()
+    scenes = load_scene_rules()["scenes"]
+    status_enums = load_status_enums()
+
+    assert localization["default_locale"] == "en"
+    assert localization["supported_locales"] == ["en", "zh"]
+    assert localization["entity_name_policy"] == "original_first"
+    assert localization["evidence_text_policy"] == "source_and_translation"
+    for locale in ("en", "zh"):
+        labels = localization["labels"][locale]
+        assert labels["excel"]["sheets"]["main"]
+        assert labels["ppt"]["title"]
+        assert labels["ui"]["opportunity_globe"]
+        assert set(scenes).issubset(labels["scenes"])
+        for enum_values in status_enums.values():
+            for value in enum_values:
+                assert value in labels["enums"]
 
 
 def test_status_and_gate_rules_load() -> None:
@@ -55,10 +136,11 @@ def test_source_registry_loads_two_country_seed_pool() -> None:
         candidate["hero_image"]["source_url"].startswith("https://")
         for candidate in candidates
     )
-    assert set(registry["countries"]) >= {"Sri Lanka", "Cambodia", "Maldives"}
+    assert set(registry["countries"]) >= {"Sri Lanka", "Cambodia", "Maldives", "Indonesia"}
     assert registry["countries"]["Sri Lanka"]["bbox"]["min_longitude"] < 80.0
     assert registry["countries"]["Cambodia"]["bbox"]["max_longitude"] > 107.0
     assert registry["countries"]["Maldives"]["bbox"]["min_latitude"] < 0.0
+    assert registry["countries"]["Indonesia"]["bbox"]["max_longitude"] > 140.0
 
 
 def test_discovery_sources_include_firecrawl_batch_templates() -> None:
@@ -165,6 +247,8 @@ def test_localized_and_free_structured_configs_load() -> None:
     assert localized["country_profiles"]["Sri Lanka"]["languages"] == ["en", "si", "ta"]
     assert localized["country_profiles"]["Cambodia"]["languages"] == ["km", "en"]
     assert localized["country_profiles"]["Maldives"]["languages"] == ["en", "dv"]
+    assert localized["country_profiles"]["Indonesia"]["languages"] == ["id", "en"]
+    assert "Google" in localized["country_profiles"]["Indonesia"]["primary_search_engines"]
 
 
 def test_scene_demand_params_use_midpoint() -> None:

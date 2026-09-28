@@ -28,6 +28,10 @@ from isite2.growth.property_identity import (
     POSSIBLE_DUPLICATE,
     known_opportunity_index_from_registry,
 )
+from isite2.growth.raw_evidence_metric_extraction import (
+    RawEvidenceMetricCleaner,
+    raw_metric_cleaner_from_env,
+)
 from isite2.rules.config_loader import load_discovery_sources, load_source_registry
 
 
@@ -46,6 +50,7 @@ class EvidenceCurationRunResult:
     review_actions: list[str] = field(default_factory=list)
     candidate_draft_ids: list[str] = field(default_factory=list)
     progress_groups: list[dict[str, Any]] = field(default_factory=list)
+    metric_cleaning_summary: dict[str, Any] = field(default_factory=dict)
 
 
 def run_pending_evidence_curation(
@@ -56,10 +61,12 @@ def run_pending_evidence_curation(
     draft_path: Path = DEFAULT_DRAFT_PATH,
     base_registry: dict[str, Any] | None = None,
     limit: int | None = None,
+    metric_cleaner: RawEvidenceMetricCleaner | None = None,
 ) -> EvidenceCurationRunResult | None:
     pending = store.list_pending_evidence(limit=limit)
     if not pending:
         return None
+    metric_cleaner = metric_cleaner if metric_cleaner is not None else raw_metric_cleaner_from_env()
 
     output_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
@@ -83,9 +90,44 @@ def run_pending_evidence_curation(
     countries: set[str] = set()
     review_actions: list[str] = []
     progress_stats: dict[tuple[str, str, str, str], dict[str, Any]] = {}
+    metric_cleaning_stats: dict[str, int] = {}
+    metric_cleaning_samples: list[dict[str, Any]] = []
 
     for raw in pending:
         draft = raw_evidence_to_candidate_draft(raw)
+        cleaning_issues: list[str] = []
+        if metric_cleaner is not None:
+            try:
+                cleaning = metric_cleaner.clean(raw, draft)
+                draft = cleaning.draft
+                cleaning_status = cleaning.status
+                cleaning_issues = cleaning.issues
+                provider_name = cleaning.provider_name
+                cache_status = cleaning.cache_status
+            except Exception as exc:
+                cleaning_status = "gpt_error"
+                cleaning_issues = [f"raw metric GPT cleaning failed: {exc}"]
+                provider_name = metric_cleaner.provider_name
+                cache_status = None
+            metric_cleaning_stats[cleaning_status] = (
+                metric_cleaning_stats.get(cleaning_status, 0) + 1
+            )
+            if cleaning_status != "rules_accepted" and len(metric_cleaning_samples) < 25:
+                metric_cleaning_samples.append(
+                    {
+                        "raw_evidence_id": raw.id,
+                        "country": draft.country,
+                        "city": draft.city,
+                        "property_name": draft.property_name,
+                        "scene_type": draft.scene_type,
+                        "status": cleaning_status,
+                        "provider_name": provider_name,
+                        "cache_status": cache_status,
+                        "field_group": draft.field_group,
+                        "field_value": draft.field_value,
+                        "issues": cleaning_issues,
+                    }
+                )
         countries.add(draft.country)
         validation = validate_candidate_draft(draft)
         key = candidate_key(draft.country, draft.city, draft.property_name, draft.scene_type)
@@ -120,7 +162,8 @@ def run_pending_evidence_curation(
             )
             or draft.identity_match_status == POSSIBLE_DUPLICATE
         )
-        if validation.accepted and duplicate_review:
+        metric_cleaning_review = bool(cleaning_issues)
+        if validation.accepted and duplicate_review and not metric_cleaning_review:
             status = "possible_duplicate_review"
             issues = [
                 "possible duplicate property identity",
@@ -130,7 +173,7 @@ def run_pending_evidence_curation(
             rejected.append(rejected_draft)
             review_actions.append(rejected_draft["next_action"])
             group["draft_review_count"] += 1
-        elif validation.accepted:
+        elif validation.accepted and not metric_cleaning_review:
             status = "candidate_accepted"
             if key in existing_keys:
                 updated_count += 1
@@ -143,7 +186,9 @@ def run_pending_evidence_curation(
             issues: list[str] = []
         else:
             status = "draft_review"
-            issues = validation.issues
+            issues = [*validation.issues, *cleaning_issues]
+            if not issues:
+                issues = ["raw metric cleaning requires review before candidate promotion"]
             rejected_draft = _rejected_draft(draft, issues)
             rejected.append(rejected_draft)
             review_actions.append(rejected_draft["next_action"])
@@ -188,6 +233,12 @@ def run_pending_evidence_curation(
         review_actions=review_actions,
         candidate_draft_ids=candidate_draft_ids,
         progress_groups=list(progress_stats.values()),
+        metric_cleaning_summary={
+            "enabled": metric_cleaner is not None,
+            "provider_name": metric_cleaner.provider_name if metric_cleaner else None,
+            "status_counts": metric_cleaning_stats,
+            "samples": metric_cleaning_samples,
+        },
     )
     summary = _curation_summary(result, accepted, rejected)
     summary_path.write_text(
@@ -235,6 +286,7 @@ def _curation_summary(
         "draft_review": rejected,
         "review_actions": result.review_actions,
         "progress_groups": result.progress_groups,
+        "metric_cleaning": result.metric_cleaning_summary,
         "improvement_points": [
             "Discovery now writes raw_evidence_items first; curation is triggered only by "
             "new or changed evidence, not by a fixed backlog threshold.",
@@ -270,6 +322,7 @@ def _render_curation_report(summary: dict[str, Any]) -> str:
             )
             + " |"
         )
+    metric_cleaning = summary.get("metric_cleaning") or {}
     improvements = "\n".join(f"- {point}" for point in summary["improvement_points"])
     return (
         f"# Evidence Curation Run {summary['curation_run_id']}\n\n"
@@ -279,6 +332,7 @@ def _render_curation_report(summary: dict[str, Any]) -> str:
         f"- Draft/review items: {summary['rejected_count']}\n"
         f"- Derived refresh required: {summary['derived_refresh_required']}\n"
         f"- Countries: {', '.join(summary['countries']) or 'None'}\n"
+        f"- Raw GPT metric cleaning: {_metric_cleaning_line(metric_cleaning)}\n"
         f"- Overlay: {summary['overlay_path']}\n"
         f"- Draft review: {summary['draft_path']}\n\n"
         "## Accepted Or Updated Evidence\n\n"
@@ -304,6 +358,14 @@ def _rejected_draft(draft: CandidateDraft, issues: list[str]) -> dict[str, Any]:
         ),
         "source_url": draft.source_url,
     }
+
+
+def _metric_cleaning_line(metric_cleaning: dict[str, Any]) -> str:
+    if not metric_cleaning.get("enabled"):
+        return "disabled"
+    counts = metric_cleaning.get("status_counts") or {}
+    count_text = ", ".join(f"{key}={value}" for key, value in sorted(counts.items()))
+    return f"{metric_cleaning.get('provider_name') or 'unknown'} ({count_text or 'no calls'})"
 
 
 def _duplicate_review_draft(

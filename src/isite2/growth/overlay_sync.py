@@ -13,6 +13,7 @@ from isite2.repositories.sqlalchemy import SQLAlchemyScanRunRepository
 
 OVERLAY_SYNC_FILTER = "overlay_active_sync"
 OVERLAY_SYNC_HASH = "overlay_sync_hash"
+OVERLAY_SYNC_FORMAT_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -30,9 +31,11 @@ class OverlaySyncResult:
 def sync_overlay_to_active_repository(
     repository: SQLAlchemyScanRunRepository,
     overlay_path: Path = DEFAULT_OVERLAY_PATH,
+    *,
+    refresh_derived: bool = True,
 ) -> OverlaySyncResult:
     source_registry = load_effective_source_registry(overlay_path)
-    countries = sorted(source_registry.get("countries", {}))
+    countries = _countries_with_candidates(source_registry)
     registry_candidate_count = sum(
         len(country.get("candidates", []))
         for country in source_registry.get("countries", {}).values()
@@ -44,16 +47,29 @@ def sync_overlay_to_active_repository(
         _sync_hash(result) == overlay_hash for result in existing_sync_runs
     ):
         latest = max(existing_sync_runs, key=lambda result: result.scan_run.created_at)
-        derived_refresh = _refresh_derived_after_sync(repository, latest.scan_run.run_id)
+        visible_candidate_count = int(
+            latest.scan_run.scope.custom_filters.get(
+                "visible_candidate_count",
+                latest.scan_run.candidate_count,
+            )
+        )
+        derived_refresh = _derived_refresh_skipped(
+            latest.scan_run.run_id,
+            reason=(
+                "overlay hash unchanged; derived fields were not refreshed"
+                if refresh_derived
+                else "overlay sync derived refresh disabled"
+            ),
+        )
         return OverlaySyncResult(
             created=False,
             run_id=latest.scan_run.run_id,
-            candidate_count=latest.scan_run.candidate_count,
+            candidate_count=visible_candidate_count,
             skipped_reason="overlay hash already synced to active repository",
             overlay_hash=overlay_hash,
             registry_candidate_count=registry_candidate_count,
             blocked_candidate_count=max(
-                registry_candidate_count - latest.scan_run.candidate_count,
+                registry_candidate_count - visible_candidate_count,
                 0,
             ),
             derived_refresh=derived_refresh,
@@ -72,24 +88,39 @@ def sync_overlay_to_active_repository(
             OVERLAY_SYNC_FILTER: True,
             OVERLAY_SYNC_HASH: overlay_hash,
             "overlay_path": str(overlay_path),
-            "sync_visible_only": True,
+            "sync_visible_only": False,
+            "visibility_authoritative_snapshot": True,
             "registry_candidate_count": registry_candidate_count,
         },
     }
     result = build_scan_result(
         scope_data,
         source_registry=source_registry,
-        include_blocked_quality=False,
+        include_blocked_quality=True,
     )
-    blocked_candidate_count = max(registry_candidate_count - len(result.packets), 0)
+    visible_candidate_count = sum(
+        packet.candidate_quality_status != "blocked_quality"
+        for packet in result.packets
+    )
+    result.scan_run.scope.custom_filters["visible_candidate_count"] = (
+        visible_candidate_count
+    )
+    blocked_candidate_count = max(
+        registry_candidate_count - visible_candidate_count,
+        0,
+    )
     prior_run_ids = [sync_result.scan_run.run_id for sync_result in existing_sync_runs]
     repository.delete_runs(prior_run_ids)
     saved = repository.save(result)
-    derived_refresh = _refresh_derived_after_sync(repository, saved.scan_run.run_id)
+    derived_refresh = (
+        _refresh_derived_after_sync(repository, saved.scan_run.run_id)
+        if refresh_derived
+        else _derived_refresh_skipped(saved.scan_run.run_id)
+    )
     return OverlaySyncResult(
         created=True,
         run_id=saved.scan_run.run_id,
-        candidate_count=saved.scan_run.candidate_count,
+        candidate_count=visible_candidate_count,
         overlay_hash=overlay_hash,
         registry_candidate_count=registry_candidate_count,
         blocked_candidate_count=blocked_candidate_count,
@@ -98,8 +129,23 @@ def sync_overlay_to_active_repository(
 
 
 def _overlay_hash(source_registry: dict) -> str:
-    payload = json.dumps(source_registry, ensure_ascii=False, sort_keys=True)
+    payload = json.dumps(
+        {
+            "sync_format_version": OVERLAY_SYNC_FORMAT_VERSION,
+            "source_registry": source_registry,
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+    )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _countries_with_candidates(source_registry: dict) -> list[str]:
+    return sorted(
+        country
+        for country, registry in source_registry.get("countries", {}).items()
+        if registry.get("candidates")
+    )
 
 
 def _overlay_sync_runs(repository: SQLAlchemyScanRunRepository):
@@ -118,4 +164,26 @@ def _refresh_derived_after_sync(
     repository: SQLAlchemyScanRunRepository,
     scan_run_id: UUID,
 ) -> dict:
-    return refresh_derived_after_scan(repository, scan_run_id)
+    visible_property_ids = [
+        str(packet.entity.property_id)
+        for packet in repository.list_properties({"scan_run_id": str(scan_run_id)})
+        if packet.candidate_quality_status != "blocked_quality"
+        and packet.entity.property_id is not None
+    ]
+    return refresh_derived_after_scan(
+        repository,
+        scan_run_id,
+        property_ids=visible_property_ids,
+    )
+
+
+def _derived_refresh_skipped(
+    scan_run_id: UUID,
+    *,
+    reason: str = "overlay sync derived refresh disabled",
+) -> dict:
+    return {
+        "mode": "gpt_derived_info_refresh",
+        "scan_run_id": str(scan_run_id),
+        "skipped_reason": reason,
+    }

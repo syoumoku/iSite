@@ -16,6 +16,8 @@ from isite2.connectors.compliance import InMemorySourceCache, classify_source_ti
 from isite2.connectors.models import FetchedPage, SearchResult
 
 RETRYABLE_STATUS_CODES = {408, 429, 500, 502, 503, 504}
+LOCAL_FIRECRAWL_BASE_URL = "http://127.0.0.1:3002/v1"
+CLOUD_FIRECRAWL_BASE_URL = "https://api.firecrawl.dev/v2"
 PROXY_ENV_VARS = (
     "HTTP_PROXY",
     "HTTPS_PROXY",
@@ -52,25 +54,35 @@ class FirecrawlPublicEvidenceProvider:
         *,
         api_key: str | None = None,
         enabled: bool | None = None,
-        base_url: str = "https://api.firecrawl.dev/v2",
+        base_url: str | None = None,
+        deployment: str | None = None,
         client: httpx.Client | None = None,
         cache: InMemorySourceCache | None = None,
         timeout_ms: int = 30_000,
-        scrape_search_results: bool = True,
+        scrape_search_results: bool | None = None,
         search_country: str | None = None,
         search_location: str | None = None,
         proxy: str | None = None,
         max_attempts: int | None = None,
         sleep_func: Any = time.sleep,
     ) -> None:
+        self.deployment = _firecrawl_deployment(deployment)
         self.api_key = (
             api_key
             if api_key is not None
             else os.getenv("FIRECRAWL_API_KEY") or _api_key_from_cli_credentials()
         )
-        self.enabled = _enabled_from_env(enabled) and bool(self.api_key)
+        self.enabled = _enabled_from_env(
+            enabled,
+            default=self.deployment == "local",
+        ) and (self.deployment == "local" or bool(self.api_key))
         env_base_url = os.getenv("FIRECRAWL_BASE_URL")
-        self.base_url = (env_base_url or base_url).rstrip("/")
+        default_base_url = (
+            LOCAL_FIRECRAWL_BASE_URL
+            if self.deployment == "local"
+            else CLOUD_FIRECRAWL_BASE_URL
+        )
+        self.base_url = (env_base_url or base_url or default_base_url).rstrip("/")
         env_timeout = os.getenv("FIRECRAWL_TIMEOUT_MS")
         if env_timeout and timeout_ms == 30_000:
             timeout_ms = int(env_timeout)
@@ -81,7 +93,11 @@ class FirecrawlPublicEvidenceProvider:
         )
         self.cache = cache or InMemorySourceCache()
         self.timeout_ms = timeout_ms
-        self.scrape_search_results = scrape_search_results
+        self.scrape_search_results = (
+            self.deployment == "cloud"
+            if scrape_search_results is None
+            else scrape_search_results
+        )
         self._search_page_cache: dict[str, FetchedPage] = {}
         self.search_country = (
             search_country
@@ -122,9 +138,10 @@ class FirecrawlPublicEvidenceProvider:
         payload: dict[str, Any] = {
             "query": query,
             "limit": limit,
-            "sources": ["web"],
             "timeout": self.timeout_ms,
         }
+        if self.deployment == "cloud":
+            payload["sources"] = ["web"]
         geo_country = country if country is not None else self.search_country
         geo_location = location if location is not None else self.search_location
         if geo_country:
@@ -190,14 +207,18 @@ class FirecrawlPublicEvidenceProvider:
         return self.cache.put(page)
 
     def _headers(self) -> dict[str, str]:
-        return {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-        }
+        headers = {"Content-Type": "application/json"}
+        if self.deployment == "cloud" and self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        return headers
 
     def _scrape_options(self) -> dict[str, Any]:
         options: dict[str, Any] = {
-            "formats": [{"type": "markdown"}],
+            "formats": (
+                ["markdown"]
+                if self.deployment == "local"
+                else [{"type": "markdown"}]
+            ),
             "onlyMainContent": True,
             "removeBase64Images": True,
             "blockAds": True,
@@ -241,7 +262,11 @@ class FirecrawlPublicEvidenceProvider:
     def _record_response_usage(self, payload: dict[str, Any]) -> None:
         if not isinstance(payload, dict):
             return
-        credits = payload.get("creditsUsed") or payload.get("credits_used") or 0
+        credits = (
+            0
+            if self.deployment == "local"
+            else payload.get("creditsUsed") or payload.get("credits_used") or 0
+        )
         try:
             self.stats.credits_used += float(credits or 0)
         except (TypeError, ValueError):
@@ -298,15 +323,29 @@ class FakeFirecrawlPublicEvidenceProvider(FirecrawlPublicEvidenceProvider):
         return results
 
 
-def _enabled_from_env(enabled: bool | None) -> bool:
+def _enabled_from_env(enabled: bool | None, *, default: bool = False) -> bool:
     if enabled is not None:
         return enabled
-    return os.getenv("FIRECRAWL_ENABLED", "false").strip().casefold() in {
+    return os.getenv(
+        "FIRECRAWL_ENABLED",
+        "true" if default else "false",
+    ).strip().casefold() in {
         "1",
         "true",
         "yes",
         "on",
     }
+
+
+def _firecrawl_deployment(deployment: str | None = None) -> str:
+    value = (
+        deployment
+        if deployment is not None
+        else os.getenv("ISITE2_FIRECRAWL_DEPLOYMENT", "local")
+    ).strip().casefold()
+    if value not in {"local", "cloud"}:
+        raise ValueError("ISITE2_FIRECRAWL_DEPLOYMENT must be 'local' or 'cloud'")
+    return value
 
 
 def firecrawl_subprocess_env(env: Mapping[str, str] | None = None) -> dict[str, str]:

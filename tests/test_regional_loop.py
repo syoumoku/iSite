@@ -9,15 +9,18 @@ from isite2.growth.evidence_intake import (
     validate_candidate_draft,
 )
 from isite2.growth.regional_loop import (
-    DEFAULT_REGIONS,
     ASIA_PACIFIC_COUNTRIES,
+    DEFAULT_REGIONS,
     LATIN_AMERICA_COUNTRIES,
+    NORTH_AFRICA_COUNTRIES,
     countries_for_regions,
     registry_backed_country_counts,
     run_regional_scan_round,
     select_country_batch,
 )
+from isite2.orchestrator.pipeline import _numeric_metric_value
 from isite2.repositories.sqlalchemy import SQLAlchemyScanRunRepository
+from isite2.rules.candidate_quality import filter_packets_for_surface
 from isite2.rules.config_loader import load_source_registry
 
 
@@ -36,11 +39,73 @@ def test_default_regions_cover_africa_and_latin_america_country_lists() -> None:
     assert len(countries) == 87
 
 
+def test_registry_metric_parser_ignores_reporting_year_before_million_value() -> None:
+    assert (
+        _numeric_metric_value("January-May 2025 passenger movement: 4.9 million passengers.")
+        == 4_900_000
+    )
+    assert (
+        _numeric_metric_value("2025 annual passenger traffic: 47.2 million passengers.")
+        == 47_200_000
+    )
+    assert (
+        _numeric_metric_value("annual_passenger_throughput: 43.712 million passengers in 2024")
+        == 43_712_000
+    )
+
+
 def test_asia_pacific_region_includes_initial_scan_batch_countries() -> None:
     countries = countries_for_regions(["Asia Pacific"])
 
-    assert ASIA_PACIFIC_COUNTRIES == ["Sri Lanka", "Cambodia", "Maldives", "Philippines"]
-    assert countries == ["Sri Lanka", "Cambodia", "Maldives", "Philippines"]
+    assert ASIA_PACIFIC_COUNTRIES == [
+        "Sri Lanka",
+        "Cambodia",
+        "Maldives",
+        "Philippines",
+        "Vietnam",
+        "Indonesia",
+        "Thailand",
+    ]
+    assert countries == [
+        "Sri Lanka",
+        "Cambodia",
+        "Maldives",
+        "Philippines",
+        "Vietnam",
+        "Indonesia",
+        "Thailand",
+    ]
+
+
+def test_north_africa_region_matches_business_scan_scope() -> None:
+    countries = countries_for_regions(["North Africa"])
+
+    assert NORTH_AFRICA_COUNTRIES == [
+        "Egypt",
+        "Ethiopia",
+        "Algeria",
+        "Morocco",
+        "Cameroon",
+        "Senegal",
+        "Cote d'Ivoire",
+        "Congo",
+        "Mali",
+        "Burkina Faso",
+        "Guinea",
+        "Gambia",
+        "Mauritania",
+        "Libya",
+        "Tunisia",
+        "Democratic Republic of the Congo",
+        "Gabon",
+        "Chad",
+        "Equatorial Guinea",
+        "Central African Republic",
+        "Cape Verde",
+        "Benin",
+    ]
+    assert countries == NORTH_AFRICA_COUNTRIES
+    assert "North Africa" not in DEFAULT_REGIONS
 
 
 def test_registry_backed_counts_include_only_objective_seeded_countries() -> None:
@@ -93,7 +158,11 @@ def test_regional_loop_round_persists_batch_report_and_artifacts(tmp_path) -> No
     assert (tmp_path / "loop" / "latest_report.md").exists()
 
     workbook = load_workbook(first_round.excel_path)
-    assert workbook["主表"].max_row == 9
+    surface_packets = filter_packets_for_surface(
+        repository.list_properties({"scan_run_id": first_round.run_id}),
+        "main_table",
+    )
+    assert workbook["Main"].max_row == len(surface_packets) + 1
 
     summary = json.loads(first_round.summary_path.read_text(encoding="utf-8"))
     assert summary["regions"] == DEFAULT_REGIONS

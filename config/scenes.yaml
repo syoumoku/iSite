@@ -55,7 +55,7 @@ scenes:
   mall_mixed_use:
     label_zh: 商场_Mixed_use
     scene_form: Indoor
-    primary_indicators: [gla, annual_footfall, flagship_position, anchor_brands, urban_catchment]
+    primary_indicators: [annual_footfall, footfall, gla, retail_gfa, flagship_position, anchor_brands, urban_catchment]
     area_metric: GLA
     fallback_metrics: [nla, retail_gfa, mixed_use_area]
     proxy_basis: [Direct Observed Metric, Retail GLA × Urban Catchment Proxy, Flagship Position × Retail Scale Proxy, Mixed-use Footfall Proxy]
@@ -81,7 +81,7 @@ scenes:
   hospital:
     label_zh: 医院
     scene_form: Indoor
-    primary_indicators: [beds, outpatient_volume, hospital_grade, referral_role, emergency_icu_surgery_intensity]
+    primary_indicators: [beds, outpatient_volume, staff_count, employee_count, hospital_grade, referral_role, emergency_icu_surgery_intensity]
     area_metric: Beds
     fallback_metrics: [main_building_gfa, campus_area, outpatient_volume]
     proxy_basis: [Direct Observed Metric, Beds + Outpatient Volume Proxy, Hospital Scale × Service Intensity Proxy]
@@ -130,3 +130,16 @@ scenes:
       indoor_capture: [0.80, 0.95]
       busy_hour_factor: [0.10, 0.20]
       gb_per_user_busy_hour: [0.35, 0.60]
+  mosque:
+    label_zh: 清真寺
+    scene_form: Indoor
+    primary_indicators: [mosque_area, gross_floor_area, prayer_hall_area, annual_visitors, annual_visits, daily_visitors, annual_footfall, footfall]
+    area_metric: Mosque Area
+    fallback_metrics: [site_area, built_up_area]
+    proxy_basis: [Direct Observed Metric, Mosque Area × Visitor Flow Proxy, Visitor Flow Proxy, Worshipper Capacity Proxy]
+    default_solution: pRRU
+    demand_parameters:
+      attach_rate: [0.65, 0.85]
+      indoor_capture: [0.75, 0.92]
+      busy_hour_factor: [0.12, 0.25]
+      gb_per_user_busy_hour: [0.30, 0.55]

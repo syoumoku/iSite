@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol
+from uuid import uuid4
 
 import yaml
 
@@ -51,8 +52,21 @@ class CandidateDraft:
     matched_property_name: str | None = None
     identity_match_reason: str | None = None
     hero_image: dict[str, Any] | None = None
+    assumption_note: str | None = None
 
     def registry_candidate(self) -> dict[str, Any]:
+        evidence = {
+            "field_group": self.field_group,
+            "indicator_name": self.indicator_name,
+            "field_value": self.field_value,
+            "source_name": self.source_name,
+            "source_tier": self.source_tier,
+            "source_url": self.source_url,
+            "source_date": self.source_date,
+            "evidence_type": self.evidence_type,
+        }
+        if self.assumption_note:
+            evidence["assumption_note"] = self.assumption_note
         candidate = {
             "property_name": self.property_name,
             "city": self.city,
@@ -72,18 +86,7 @@ class CandidateDraft:
                 "coordinate_status": "Verified",
             },
             "discovery_source": "public_evidence_intake",
-            "evidence": [
-                {
-                    "field_group": self.field_group,
-                    "indicator_name": self.indicator_name,
-                    "field_value": self.field_value,
-                    "source_name": self.source_name,
-                    "source_tier": self.source_tier,
-                    "source_url": self.source_url,
-                    "source_date": self.source_date,
-                    "evidence_type": self.evidence_type,
-                }
-            ],
+            "evidence": [evidence],
             "identity_match": {
                 "status": self.identity_match_status,
                 "matched_property_id": self.matched_property_id,
@@ -258,10 +261,13 @@ def load_registry_overlay(path: Path) -> dict[str, Any]:
 
 def write_registry_overlay(path: Path, registry: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temp_path = path.with_suffix(path.suffix + ".tmp")
-    with temp_path.open("w", encoding="utf-8") as handle:
-        yaml.safe_dump(registry, handle, allow_unicode=True, sort_keys=False)
-    temp_path.replace(path)
+    temp_path = path.with_name(f"{path.name}.{uuid4().hex}.tmp")
+    try:
+        with temp_path.open("w", encoding="utf-8") as handle:
+            yaml.safe_dump(registry, handle, allow_unicode=True, sort_keys=False)
+        temp_path.replace(path)
+    finally:
+        temp_path.unlink(missing_ok=True)
 
 
 def write_draft_review(path: Path, rejected: list[dict[str, Any]]) -> None:
@@ -384,6 +390,8 @@ def _merge_candidate_evidence(
                 existing_by_key[evidence_key] = len(existing_evidence) - 1
             elif existing_evidence[existing_index] != evidence:
                 existing_evidence[existing_index] = evidence
+        if incoming.get("hero_image"):
+            candidate["hero_image"] = dict(incoming["hero_image"])
         return
 
 

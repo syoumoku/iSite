@@ -40,7 +40,7 @@ def test_africa_loop_round_persists_database_artifacts_and_report(tmp_path) -> N
     assert (tmp_path / "loop" / "latest_report.md").exists()
 
     workbook = load_workbook(first_round.excel_path)
-    assert workbook["主表"].max_row == 5
+    assert workbook["Main"].max_row == 5
 
     summary = json.loads(first_round.summary_path.read_text(encoding="utf-8"))
     assert summary["country"] == "Algeria"

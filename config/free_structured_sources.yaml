@@ -65,6 +65,7 @@ sources:
       transport_hub: ["ridership", "daily_ridership"]
       hospital: ["beds"]
       university: ["students", "enrollment"]
+      mosque: ["mosque_area", "gross_floor_area", "annual_visitors", "daily_visitors"]
 
   dbpedia_sparql:
     name: "DBpedia SPARQL"
@@ -82,6 +83,7 @@ sources:
       luxury_hotel_mice: ["rooms"]
       hospital: ["beds"]
       university: ["students"]
+      mosque: ["mosque_area", "gross_floor_area", "annual_visitors"]
 
   ourairports_csv:
     name: "OurAirports CSV"
@@ -113,6 +115,7 @@ sources:
       transport_hub: []
       hospital: ["beds"]
       university: ["students"]
+      mosque: ["capacity"]
 
   official_open_data_catalogs:
     name: "Official Open Data Catalog APIs"
@@ -150,6 +153,7 @@ sources:
       transport_hub: ["daily_ridership", "ridership"]
       hospital: ["beds", "outpatient_volume"]
       university: ["students", "enrollment"]
+      mosque: ["mosque_area", "gross_floor_area", "annual_visitors", "daily_visitors"]
 
   firecrawl_gap_fill:
     name: "Firecrawl Gap Fill"
@@ -170,6 +174,7 @@ sources:
       transport_hub: ["daily_ridership", "ridership"]
       hospital: ["beds", "outpatient_volume"]
       university: ["students", "enrollment"]
+      mosque: ["mosque_area", "gross_floor_area", "prayer_hall_area", "annual_visitors", "daily_visitors"]
 
 scene_source_matrix:
   airport_terminal:
@@ -198,4 +203,7 @@ scene_source_matrix:
     identity_sources: ["openstreetmap_overpass"]
   university:
     primary_sources: ["wikipedia_mediawiki_api", "dbpedia_sparql", "openstreetmap_overpass", "official_open_data_catalogs"]
+    identity_sources: ["openstreetmap_overpass"]
+  mosque:
+    primary_sources: ["wikipedia_mediawiki_api", "dbpedia_sparql", "official_report_index"]
     identity_sources: ["openstreetmap_overpass"]

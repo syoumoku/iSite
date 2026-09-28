@@ -67,6 +67,7 @@ blocked_city_level_tokens:
   - province
   - state
   - region
+  - raion
   - district
   - governorate
   - county
@@ -87,6 +88,17 @@ blocked_city_level_tokens:
 blocked_city_exact_values:
   default:
     - republic of maldives
+  Cyprus:
+    - Northern Cyprus
+  Algeria:
+    - Annaba Province
+    - Constantine Province
+    - Djanet Province
+    - Ghardaïa Province
+    - Ghardaia Province
+    - Oran Province
+    - Ouargla Province
+    - Tamanrasset Province
   Argentina:
     - Rosario Department
     - Chubut
@@ -99,10 +111,34 @@ blocked_city_exact_values:
     - La Cisterna
     - La Florida
     - Lo Prado
+    - Los Lagos
     - Ñuñoa
     - Nunoa
     - Providencia
     - Pudahuel
+  Colombia:
+    - Antioquia
+    - Atlántico
+    - Atlantico
+    - Bolívar
+    - Bolivar
+    - Cundinamarca
+    - Santander
+    - Valle del Cauca
+  Cote d'Ivoire:
+    - Ivory Coast
+  Ecuador:
+    - Amazon
+    - Azuay
+    - El Oro
+    - Guayas
+    - Imbabura
+    - Los Ríos
+    - Los Rios
+    - Manabí
+    - Manabi
+    - Pichincha
+    - Tungurahua
   Ghana:
     - Amansie West
     - Ashanti
@@ -152,6 +188,21 @@ blocked_city_exact_values:
     - Sariyer
     - Vişnezade
     - Visnezade
+  Vietnam:
+    - North Central Coast
+    - South Central Coast
+    - Red River Delta
+    - Mekong Delta
+    - Southeast
+    - Central Highlands
+    - Bình Định
+    - Binh Dinh
+    - Khánh Hòa
+    - Khanh Hoa
+    - Quảng Bình
+    - Quang Binh
+    - Tân Bình
+    - Tan Binh
 blocked_city_regexes:
   - "^q[0-9]+$"
 blocked_geocode_precision_tokens:
@@ -227,6 +278,13 @@ scene_title_tokens:
     - port
     - cruise
     - terminal
+  mosque:
+    - mosque
+    - masjid
+    - jami
+    - grand mosque
+    - جامع
+    - مسجد
 allowed_geocode_precision_tokens:
   airport_terminal:
     - airport
@@ -291,6 +349,14 @@ allowed_geocode_precision_tokens:
     - port
     - cruise
     - terminal
+  mosque:
+    - mosque
+    - masjid
+    - prayer hall
+    - islamic center
+    - islamic centre
+    - venue
+    - building
 objective_indicator_aliases:
   airport_terminal:
     - annual_passenger_throughput
@@ -349,6 +415,18 @@ objective_indicator_aliases:
   cruise_port:
     - passenger_throughput
     - annual_passenger_throughput
+  mosque:
+    - mosque_area
+    - gross_floor_area
+    - prayer_hall_area
+    - site_area
+    - built_up_area
+    - annual_visitors
+    - annual_visits
+    - annual_footfall
+    - footfall
+    - daily_visitors
+    - visitor_count
 blocking_surfaces:
   - main_table
   - map

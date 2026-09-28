@@ -56,6 +56,12 @@
         "city": {
           "type": "string"
         },
+        "city_id": {
+          "type": ["string", "null"]
+        },
+        "city_assignment": {
+          "type": ["object", "null"]
+        },
         "scene_type": {
           "type": "string"
         },
@@ -73,6 +79,45 @@
         },
         "main_metric_text": {
           "type": "string"
+        },
+        "annual_visits_p10": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "annual_visits_p50": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "annual_visits_p90": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "traffic_model_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "complaint_pressure": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "network_validation_priority": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "feature_flags": {
+          "type": "object"
         },
         "review_count": {
           "type": "integer"

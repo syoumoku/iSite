@@ -18,10 +18,27 @@ def test_firecrawl_provider_disabled_without_api_key(monkeypatch, tmp_path) -> N
     monkeypatch.setenv("FIRECRAWL_CLI_CREDENTIALS_PATH", str(tmp_path / "missing.json"))
     monkeypatch.setenv("FIRECRAWL_ENABLED", "true")
 
-    provider = FirecrawlPublicEvidenceProvider()
+    provider = FirecrawlPublicEvidenceProvider(deployment="cloud")
 
     assert provider.enabled is False
     assert provider.search("airport passenger traffic") == []
+
+
+def test_firecrawl_provider_defaults_to_local_without_api_key(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    monkeypatch.delenv("FIRECRAWL_API_KEY", raising=False)
+    monkeypatch.delenv("ISITE2_FIRECRAWL_DEPLOYMENT", raising=False)
+    monkeypatch.delenv("FIRECRAWL_ENABLED", raising=False)
+    monkeypatch.setenv("FIRECRAWL_CLI_CREDENTIALS_PATH", str(tmp_path / "missing.json"))
+
+    provider = FirecrawlPublicEvidenceProvider()
+
+    assert provider.enabled is True
+    assert provider.deployment == "local"
+    assert provider.base_url == "http://127.0.0.1:3002/v1"
+    assert "Authorization" not in provider._headers()
 
 
 def test_firecrawl_provider_reads_cli_credentials_when_env_key_missing(
@@ -89,6 +106,8 @@ def test_firecrawl_cli_wrapper_print_env_strips_proxy_vars(tmp_path) -> None:
     )
     payload = json.loads(completed.stdout)
 
+    assert payload["deployment"] == "local"
+    assert payload["cloud_credits_expected"] == 0
     assert payload["proxy_vars_present_after_sanitize"]["HTTP_PROXY"] is False
     assert payload["proxy_vars_present_after_sanitize"]["HTTPS_PROXY"] is False
 
@@ -147,6 +166,7 @@ def test_firecrawl_search_payload_uses_egypt_markdown_scrape_options() -> None:
     provider = FirecrawlPublicEvidenceProvider(
         api_key="fc-test",
         enabled=True,
+        deployment="cloud",
         client=client,
         sleep_func=lambda _: None,
     )
@@ -192,6 +212,7 @@ def test_firecrawl_scrape_parses_data_shape_and_retries_retryable_status() -> No
     provider = FirecrawlPublicEvidenceProvider(
         api_key="fc-test",
         enabled=True,
+        deployment="cloud",
         client=client,
         max_attempts=2,
         sleep_func=sleep_calls.append,
@@ -205,6 +226,64 @@ def test_firecrawl_scrape_parses_data_shape_and_retries_retryable_status() -> No
     assert page.source_url == "https://venue.example.eg/profile"
     assert "30,000 sqm" in page.content_text
     assert provider.stats.scrape_requests == 1
+
+
+def test_local_firecrawl_scrape_uses_v1_string_format_and_zero_cloud_credits() -> None:
+    client = RecordingFirecrawlClient(
+        [
+            _json_response(
+                {
+                    "success": True,
+                    "data": {
+                        "markdown": "The venue has 20,000 square metres.",
+                        "metadata": {"sourceURL": "https://venue.example.gh/"},
+                    },
+                    "creditsUsed": 1,
+                }
+            )
+        ]
+    )
+    provider = FirecrawlPublicEvidenceProvider(
+        enabled=True,
+        deployment="local",
+        client=client,
+    )
+
+    provider.fetch_page("https://venue.example.gh/")
+
+    assert client.requests[0]["json"]["formats"] == ["markdown"]
+    assert "Authorization" not in client.requests[0]["headers"]
+    assert provider.stats.credits_used == 0
+
+
+def test_local_firecrawl_search_omits_cloud_only_fields_and_deferred_scrape() -> None:
+    client = RecordingFirecrawlClient(
+        [
+            _json_response(
+                {
+                    "success": True,
+                    "data": [
+                        {
+                            "title": "Local search result",
+                            "url": "https://venue.example.kz/",
+                            "description": "Official venue profile.",
+                        }
+                    ],
+                }
+            )
+        ]
+    )
+    provider = FirecrawlPublicEvidenceProvider(
+        enabled=True,
+        deployment="local",
+        client=client,
+    )
+
+    provider.search("Kazakhstan venue capacity", limit=1)
+
+    payload = client.requests[0]["json"]
+    assert "sources" not in payload
+    assert "scrapeOptions" not in payload
 
 
 class RecordingFirecrawlClient:

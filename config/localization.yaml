@@ -1,0 +1,824 @@
+version: "0.1"
+schema_version: localization.v1
+default_locale: en
+fallback_locale: en
+supported_locales: [en, zh]
+entity_name_policy: original_first
+evidence_text_policy: source_and_translation
+labels:
+  en:
+    fallback:
+      missing_key: "[missing localization]"
+      unknown: Unknown
+      no_rows: No rows
+      "yes": "yes"
+      no_available_metric: No available quantified primary metric; not recommended
+      no_primary_metric: No primary metric
+      missing_primary_metric: Missing primary metric
+      operator_candidates: "Unknown (operator candidates)"
+      public_image_source: Public image source
+      no_verified_public_image: No verified public image
+      no_verified_public_image_body: Real public image evidence is missing or unavailable.
+      no_generated_images_notice: Satellite maps, screenshots, and generated visuals are not used as real property images.
+      localization_pending: Localization pending
+    scenes:
+      airport_terminal: Airport
+      convention_center: Convention Center
+      stadium: Stadium
+      luxury_hotel_mice: Luxury Hotel / MICE
+      mall_mixed_use: Mall / Mixed-use
+      office_government: Office / Government
+      hospital: Hospital
+      university: University
+      transport_hub: Transport Hub
+      cruise_port: Cruise Port
+      mosque: Mosque
+    metrics:
+      annual_passenger_throughput: Annual passenger throughput
+      passenger_throughput: Passenger throughput
+      terminal_capacity: Terminal capacity
+      international_passenger_share: International passenger share
+      exhibition_area: Exhibition area
+      meeting_area: Meeting area
+      annual_events: Annual events
+      international_event_frequency: International event frequency
+      peak_event_capacity: Peak event capacity
+      plenary_capacity: Plenary capacity
+      seat_count: Seat count
+      event_days: Event days
+      international_events: International events
+      main_venue_role: Main venue role
+      hotel_class: Hotel class
+      brand: Brand
+      keys: Rooms / keys
+      room_count: Room count
+      meeting_ballroom_area: Meeting / ballroom area
+      ballroom_capacity: Ballroom capacity
+      gla: GLA
+      annual_footfall: Annual footfall
+      flagship_position: Flagship position
+      anchor_brands: Anchor brands
+      urban_catchment: Urban catchment
+      office_nla: Office NLA
+      office_gfa: Office GFA
+      tower_height: Tower height
+      building_grade: Building grade
+      tenant_quality: Tenant quality
+      hq_density: HQ density
+      cbd_role: CBD role
+      beds: Beds
+      outpatient_volume: Outpatient volume
+      hospital_grade: Hospital grade
+      referral_role: Referral role
+      enrollment: Enrollment
+      campus_population: Campus population
+      daily_ridership: Daily ridership
+      interchange_volume: Interchange volume
+      line_count: Interchange lines
+      hub_role: Hub role
+      mosque_area: Mosque area
+      gross_floor_area: Gross floor area
+      prayer_hall_area: Prayer hall area
+      site_area: Site area
+      built_up_area: Built-up area
+      annual_visitors: Annual visitors
+      daily_visitors: Daily visitors
+      worshipper_capacity: Worshipper capacity
+      peak_prayer_attendance: Peak prayer attendance
+      Terminal Area: Terminal area
+      Exhibition Area: Exhibition area
+      Seat Count: Seat count
+      GLA: GLA
+      NLA: NLA
+      Station/Concourse Area: Station / concourse area
+      Core Facility Area: Core facility area
+      Mosque Area: Mosque area
+    enums:
+      Verified: Verified
+      Supported: Supported
+      Indicative: Indicative
+      Insufficient: Insufficient
+      National Flagship: National Flagship
+      City Core: City Core
+      Regional Anchor: Regional Anchor
+      Local Candidate: Local Candidate
+      Observation: Observation
+      Direct Recommend: Direct Recommend
+      Survey First: Survey First
+      Review Queue: Review Queue
+      Monitor: Monitor
+      Confirmed Present: Confirmed Present
+      Confirmed Absent: Confirmed Absent
+      Likely Present: Likely Present
+      Likely Absent: Likely Absent
+      No Public Evidence: No Public Evidence
+      Planned / Under Construction: Planned / Under Construction
+      Traditional DAS: Traditional DAS
+      Digital DAS: Digital DAS
+      Hybrid DAS: Hybrid DAS
+      Small Cells / Other Indoor System: Small Cells / Other Indoor System
+      Unknown: Unknown
+      4G: 4G
+      5G: 5G
+      4G+5G: 4G+5G
+      Multi-RAT Legacy: Multi-RAT Legacy
+      P0 Direct: P0 Direct
+      P1 Strong Proxy: P1 Strong Proxy
+      P2 Moderate Proxy: P2 Moderate Proxy
+      P3 Weak Proxy: P3 Weak Proxy
+      Tier 1: Tier 1
+      Tier 2: Tier 2
+      Tier 3: Tier 3
+      Direct: Direct
+      Proxy: Proxy
+      Inferred: Inferred
+      Context: Context
+      Strong Cross-check: Strong Cross-check
+      Partial Cross-check: Partial Cross-check
+      Single Source: Single Source
+      Evidence Conflict: Evidence Conflict
+      Not Checked: Not Checked
+      pRRU: pRRU
+      hRRU: hRRU
+    ui:
+      opportunity_globe: Opportunity Globe
+      opportunity_actions: Opportunity actions
+      ask_isite2: Ask iSite2
+      export_excel: Export Excel
+      export_ppt: Export PPT
+      language: Language
+      loading: Loading
+      countries_visible: countries visible
+      cities_visible: cities visible
+      discovery_tasks: Discovery {task_count} tasks / {evidence_count} new evidence
+      country_opportunities: Country Opportunities
+      all_candidate_countries: All candidate countries
+      all_countries: All countries
+      all_cities_in_country: All cities in {country}
+      workspace: Workspace
+      workspace_context: Workspace context
+      property_dossier: Property Dossier
+      back_to_list: Back to list
+      country_scope: Country scope
+      city_scope: City scope
+      search_countries: Search countries
+      search_cities: Search cities
+      back_to_countries: Back to countries
+      cities: cities
+      localities: localities
+      no_cities_found: No cities found
+      locality: Locality / Commune
+      search_properties: Search properties
+      searching_properties: Searching properties
+      no_properties_found: No properties found
+      clear_search: Clear search
+      export_country_insight: Export country insight
+      preparing_country_report: Preparing report
+      country_report_preparing: The latest country report is being prepared.
+      country_report_downloaded: Country insight downloaded
+      no_countries_found: No countries found
+      no_visible_points: No visible points
+      no_scan_data: No scan data
+      adjust_filters: Adjust filters or return to all countries.
+      no_candidates_in_db: No candidate properties are currently stored in the database.
+      property_load_failed: Property data could not be loaded.
+      property_load_failed_body: This country has candidates. Retry without losing your current selection.
+      retry: Retry
+      ai_thinking: AI Thinking
+      evidence_packet_loading: Map markers are ready while the full evidence packet list loads.
+      property: Property
+      scene: Scene
+      primary_metric: Primary metric
+      network_experience: Network Experience
+      ookla_tile_proxy: Ookla tile proxy
+      network_experience_proxy_note: Tile-level experience proxy, not indoor DAS/build evidence.
+      network_complaints: Network complaints
+      property_complaint_signals: Property-level public signals
+      complaint_signal_note: Aggregated public network complaints only. This does not prove indoor DAS/build status.
+      complaint_empty: No compliant property-level network complaints are currently available.
+      valid_complaints: Valid complaints
+      complaint_sources: Complaint sources
+      complaint_pressure: Pressure
+      complaint_period: Observation window
+      complaint_latest: Latest observation
+      complaint_categories: Complaint categories
+      complaint_period_days: "{days} days"
+      complaint_no_signal: No signal
+      complaint_weak_coverage: Weak coverage
+      complaint_slow_data: Slow data
+      complaint_dropped_call: Dropped calls
+      complaint_outage: Network outage
+      complaint_insufficient: Insufficient
+      high: High
+      moderate: Moderate
+      low: Low
+      mobile_network: Mobile
+      fixed_network: Fixed
+      download_mbps: Download Mbps
+      upload_mbps: Upload Mbps
+      latency_ms: Latency ms
+      samples: Samples
+      tile_distance: Tile distance
+      tests_devices: "{tests} tests / {devices} devices"
+      high_confidence: High confidence
+      medium_confidence: Medium confidence
+      low_confidence: Low confidence
+      evidence: Evidence
+      sources: Evidence
+      review: Review
+      action: Action
+      candidates: Candidates
+      countries: Countries
+      cities: Cities
+      card: Card
+      dense: Dense
+      card_view: Card view
+      dense_view: Dense view
+      region_distribution: Region distribution
+      scan_maturity: Scan maturity
+      scan_maturity_seed: Seed scan
+      scan_maturity_expanding: Deep expansion
+      scan_maturity_saturated: Near saturation
+      scan_maturity_seed_help: Initial candidate pool; sources and scenes still need expansion.
+      scan_maturity_expanding_help: Multi-source or multi-round expansion completed; the pool is not yet considered saturated.
+      scan_maturity_saturated_help: The planned source matrix has produced no new candidates across consecutive rounds.
+      map_source: Map Source
+      annual_visits: Annual Visits
+      busy_users: Busy Users
+      busy_traffic_gb: Busy Traffic GB
+      bandwidth_mbps: Bandwidth Mbps
+      coordinate: Coordinate
+      indoor_rat: Indoor RAT
+      action_class: Action Class
+      next_action: Next Action
+      google_maps: Google Maps
+      investment_cockpit: Investment cockpit
+      original_evidence: Original evidence
+      evidence_translation: Evidence translation
+      inference: Inference
+      review_tab: Review
+      rag_entry: RAG Entry
+      current_rag_context: Current RAG context
+      question: Question
+      send: Send
+      retrieving: Retrieving
+      ask_failed: Ask iSite2 failed
+      retrieval_ready: Evidence-backed retrieval ready
+      retrieval_ready_body: Answers will include citations and concrete review actions.
+      answer: Answer
+      priority: Priority
+      review_actions: Review Actions
+      citations: Citations
+      indexed_evidence: Indexed evidence
+      unknown_tier: Unknown tier
+      satellite_map: Satellite opportunity map
+      loading_map_engine: Loading map engine
+      street_level_satellite: Street-level satellite
+      city_satellite: City satellite
+      country_satellite: Country satellite
+      initializing_globe_engine: Initializing globe engine
+      loading_country_intelligence: Loading country intelligence
+      projecting_opportunity_markers: Projecting opportunity markers
+      preparing_regional_brief: Preparing regional brief
+      guest_access: Guest access
+      guest_clicks_remaining: "{count} clicks left"
+      sign_in: Sign in
+      sign_out: Sign out
+      signed_in_as: "Signed in as {username}"
+      login_required: Login required
+      login_required_body: Guest access includes {limit} clicks. Sign in to continue.
+      username: Username
+      password: Password
+      invalid_credentials: Invalid username or password
+      close: Close
+      request_short: Request
+      request_title: Submit a request
+      request_intro: Tell us what should be expanded or delivered.
+      request_type: Request type
+      request_scan: Expand scan
+      request_feature: Feature idea
+      request_ppt: PPT report
+      request_country: Country
+      request_country_placeholder: Search or enter a country
+      request_country_placeholder_existing: Search available countries
+      request_use_custom_country: Use “{value}” as a custom country
+      request_city_scope: City scope
+      request_single_city: Single city
+      request_national_main_cities: National main cities
+      request_city: City
+      request_city_placeholder: Search or enter a city
+      request_use_custom_city: Use “{value}” as a custom city
+      request_custom_location_status: Custom entry · verified after submission
+      request_no_matching_locations: No matching locations
+      request_location_required: Choose or enter the required location.
+      request_scene: Scene
+      request_scenes: Scenes
+      request_scenes_selected: "{count} selected"
+      request_clear_scenes: Clear
+      request_scene_required: Select at least one scene.
+      request_target_count: Target new qualified properties
+      request_target_note: Only new properties that pass the quality gate and enter active count toward the target.
+      request_target_total_note: One combined target across all selected scenes. Only new properties that pass the quality gate and enter active count.
+      request_decrease_target: Decrease target
+      request_increase_target: Increase target
+      request_feature_title: Feature title
+      request_current_workflow: Current workflow
+      request_requested_flow: Requested flow
+      request_expected_outcome: Expected outcome
+      request_report_language: Report language
+      request_contact_email: Contact email
+      request_email_note: We will use this email only for completion delivery and report attachments.
+      request_submit: Submit request
+      request_submitting: Submitting
+      request_submitted: Request submitted
+      request_submitted_body: Keep this request code for reference. Completion will be sent by email after approval and execution.
+      request_submit_another: Submit another
+      request_submit_error: Request submission failed.
+      request_load_options_error: Unable to load request options.
+      updates_short: Updates
+      updates_title: Product updates
+      updates_intro: Recently published scan and feature improvements.
+      updates_empty: No published updates yet.
+      updates_load_error: Unable to load updates.
+      update_scan: Scan update
+      update_feature: Feature update
+    email:
+      request_completed_subject: "iSite2 request {request_code} completed"
+      request_completed_body: |-
+        Your iSite2 request {request_code} has been completed.
+
+        Completion summary:
+        {summary}
+    excel:
+      required_sheet_keys: [main, recommendation, evidence, inference, proxy_model, review_queue, country_summary, method, airport_terminal, convention_center, mall_mixed_use, stadium, luxury_hotel_mice, office_government, hospital, university, transport_hub, mosque]
+      scene_sheet_keys: [airport_terminal, convention_center, mall_mixed_use, stadium, luxury_hotel_mice, office_government, hospital, university, transport_hub, mosque]
+      sheets:
+        main: Main
+        recommendation: Recommendations
+        evidence: Evidence
+        inference: Inference Trace
+        proxy_model: Proxy Model
+        review_queue: Review Queue
+        country_summary: Country Summary
+        method: Method
+        airport_terminal: Airports
+        convention_center: Convention Centers
+        mall_mixed_use: Mall Mixed-use
+        stadium: Stadiums
+        luxury_hotel_mice: Luxury Hotels MICE
+        office_government: Office Government
+        hospital: Hospitals
+        university: Universities
+        transport_hub: Transport Hubs
+        mosque: Mosques
+      columns:
+        main: [Country, City, Property Name, Longitude, Latitude, Scene Type, Core Objective Evidence, Primary Metric Value, Estimated Annual Visits (Proxy), "Busy-hour Traffic (GB/h, Proxy)", Indoor System Presence, RAT (4G/5G), Operator, Indoor System Type, Evidence Batch, Evidence Status, Recommended, Recommendation Reason, Next Verification Action, Google Maps Link]
+        recommendation: [Country, City, Property Name, Scene Type, Recommendation Rank, Recommendation Threshold, Threshold Metric, Threshold Metric Value, Core Objective Evidence, Estimated Annual Visits (Proxy), Recommendation Reason, Google Maps Link]
+        evidence: [Row, Country, City, Property Name, Scene Type, Field Group, Original Evidence, Evidence Translation, Evidence Type / Proxy Basis, Evidence Tier, Source 1 URL, Source 2 URL, Cross-check Status]
+        inference: [Row, Country, Property Name, Inferred Field, Inferred Value, Inference Basis, Inference Chain, Inference Confidence]
+        proxy_model: [Scene Type, Primary Value Indicators, Area / Scale Field, Annual Visit Proxy, attach_rate, indoor_capture, busy_hour_factor, GB/user/BH]
+        review_queue: [Row, Country, City, Property Name, Review Reason, Next Action]
+        country_summary: [Country, Candidate Count, Airport, Convention Center, Mall / Mixed-use, Stadium, Hotel / MICE, Office / Government, Hospital, University, Transport Hub, Mosque]
+      method_rows:
+        - [Scope, "{scope_text}"]
+        - [Main Table Rule, Main table keeps property-level key results only; shared formulas and definitions are not repeated row by row.]
+        - [Sorting Rule, Main table sorts by estimated annual visits descending; scene sheets sort by scene primary metric value descending, with missing or non-numeric metrics at the end. The Primary Metric Value column sits immediately to the right of Core Objective Evidence and extracts the selected evidence numeric value for one-click Excel sorting.]
+        - [Recommendation Threshold Rule, Recommendations use project-level fixed First Class thresholds first. Configured scenes use their hard primary metric threshold; unconfigured scenes fall back to the tenth ranked hard metric within country and scene. Recommended rows are highlighted in light yellow, the Recommended column is set to yes, and the same rows are collected in the Recommendations sheet.]
+        - [Evidence Rule, Every conclusion must be traceable to field-level evidence, source, date, evidence tier, and cross-check status.]
+        - [Inference Rule, Inference only fills empty fields, must be recorded in the inference trace, and cannot override direct evidence.]
+        - [Scene Modeling Rule, Each scene uses its own primary indicators, proxy basis, and demand parameter ranges.]
+        - [Proxy Rule, Proxy model details are centralized in the Proxy Model sheet.]
+        - [Build Status Rule, Existing indoor build status is judged independently; Unknown is allowed but empty values are not.]
+        - [Output Constraint, Main table headers are fixed; scene sheets keep headers even when empty. Primary Metric Value is a typed numeric column, not a formatted text copy.]
+        - [Evidence Status Definitions, Verified / Supported / Indicative / Insufficient.]
+        - [Google Maps Link Rule, Main table must retain the Google Maps link.]
+    ppt:
+      title: iSite2 Insight Cards
+      subtitle_candidates: "{count} candidate sites"
+      logic_title: Rule / Advancement Logic
+      logic_body: Evidence -> Scene Model -> Build Status -> Demand -> Inference -> Conclusion -> Review Queue. Build status is judged independently from property value.
+      snapshot_title: Portfolio Snapshot
+      candidates: Candidates
+      direct_recommend: Direct Recommend
+      survey_first: Survey First
+      review_items: Review Items
+      location: Location
+      scene: Scene
+      recommended_solution: Recommended Solution
+      status: Status
+      core_metric: Core Metric
+      busy_hour: Busy Hour
+      area_scale: Area / Scale
+      coordinates: Coordinates
+      build_status: Build Status
+      value_judgment: Value Judgment
+      risk_next_action: Risk / Next Action
+      evidence_entries: Evidence Entries
+  zh:
+    fallback:
+      missing_key: "[缺少本地化]"
+      unknown: 未知
+      no_rows: 无记录
+      "yes": "yes"
+      no_available_metric: 无可用量化主指标，未推荐
+      no_primary_metric: 无主指标
+      missing_primary_metric: 主指标缺失
+      operator_candidates: "Unknown（候选：运营商列表）"
+      public_image_source: 公开图片来源
+      no_verified_public_image: 无可验证公开图片
+      no_verified_public_image_body: 真实公开图片证据缺失或不可用。
+      no_generated_images_notice: 卫星地图、截图和生成图片不作为真实物业图片。
+      localization_pending: 本地化待刷新
+    scenes:
+      airport_terminal: 机场
+      convention_center: 会展中心
+      stadium: 体育场
+      luxury_hotel_mice: 酒店_MICE
+      mall_mixed_use: 商场_Mixed-use
+      office_government: 办公_政府
+      hospital: 医院
+      university: 大学
+      transport_hub: 交通枢纽
+      cruise_port: 港口_邮轮码头
+      mosque: 清真寺
+    metrics:
+      annual_passenger_throughput: 年旅客吞吐量
+      passenger_throughput: 旅客吞吐量
+      terminal_capacity: 航站楼容量
+      international_passenger_share: 国际旅客占比
+      exhibition_area: 会展面积
+      meeting_area: 会议面积
+      annual_events: 年活动数
+      international_event_frequency: 国际活动频次
+      peak_event_capacity: 峰值活动容量
+      plenary_capacity: 全会厅容量
+      seat_count: 座位数
+      event_days: 活动天数
+      international_events: 国际赛事/活动
+      main_venue_role: 主场馆角色
+      hotel_class: 酒店等级
+      brand: 品牌
+      keys: 房间数
+      room_count: 房间数
+      meeting_ballroom_area: 会议/宴会厅面积
+      ballroom_capacity: 宴会厅容量
+      gla: GLA
+      annual_footfall: 年客流
+      flagship_position: 旗舰地位
+      anchor_brands: 主力品牌
+      urban_catchment: 城市客群
+      office_nla: 办公 NLA
+      office_gfa: 办公 GFA
+      tower_height: 楼高
+      building_grade: 楼宇等级
+      tenant_quality: 租户质量
+      hq_density: 总部密度
+      cbd_role: CBD 角色
+      beds: 床位数
+      outpatient_volume: 门诊量
+      hospital_grade: 医院等级
+      referral_role: 转诊角色
+      enrollment: 在校生人数
+      campus_population: 校园人口
+      daily_ridership: 日客流
+      interchange_volume: 换乘量
+      line_count: 换乘线路数
+      hub_role: 枢纽角色
+      mosque_area: 清真寺面积
+      gross_floor_area: 总建筑面积
+      prayer_hall_area: 礼拜厅面积
+      site_area: 用地面积
+      built_up_area: 建筑面积
+      annual_visitors: 年访问量
+      daily_visitors: 日访问量
+      worshipper_capacity: 礼拜容量
+      peak_prayer_attendance: 峰值礼拜人流
+      Terminal Area: 航站楼面积
+      Exhibition Area: 会展面积
+      Seat Count: 座位数
+      GLA: GLA
+      NLA: NLA
+      Station/Concourse Area: 车站/站厅面积
+      Core Facility Area: 核心设施面积
+      Mosque Area: 清真寺面积
+    enums:
+      Verified: 已验证
+      Supported: 有支撑
+      Indicative: 指示性
+      Insufficient: 证据不足
+      National Flagship: 国家级旗舰
+      City Core: 城市核心
+      Regional Anchor: 区域锚点
+      Local Candidate: 本地候选
+      Observation: 观察
+      Direct Recommend: 直接推荐
+      Survey First: 先勘测
+      Review Queue: 进入复核
+      Monitor: 持续观察
+      Confirmed Present: 已确认存在
+      Confirmed Absent: 已确认不存在
+      Likely Present: 可能存在
+      Likely Absent: 可能不存在
+      No Public Evidence: 无公开证据
+      Planned / Under Construction: 规划/建设中
+      Traditional DAS: 传统 DAS
+      Digital DAS: 数字 DAS
+      Hybrid DAS: 混合 DAS
+      Small Cells / Other Indoor System: 小站/其他室分系统
+      Unknown: 未知
+      4G: 4G
+      5G: 5G
+      4G+5G: 4G+5G
+      Multi-RAT Legacy: 多制式存量
+      P0 Direct: P0 直接证据
+      P1 Strong Proxy: P1 强 Proxy
+      P2 Moderate Proxy: P2 中等 Proxy
+      P3 Weak Proxy: P3 弱 Proxy
+      Tier 1: Tier 1
+      Tier 2: Tier 2
+      Tier 3: Tier 3
+      Direct: 直接证据
+      Proxy: Proxy
+      Inferred: 推测
+      Context: 上下文证据
+      Strong Cross-check: 强交叉验证
+      Partial Cross-check: 部分交叉验证
+      Single Source: 单一来源
+      Evidence Conflict: 证据冲突
+      Not Checked: 未交叉验证
+      pRRU: pRRU
+      hRRU: hRRU
+    ui:
+      opportunity_globe: 机会地图
+      opportunity_actions: 机会操作
+      ask_isite2: Ask iSite2
+      export_excel: 导出 Excel
+      export_ppt: 导出 PPT
+      language: 语言
+      loading: 加载中
+      countries_visible: 个国家可见
+      cities_visible: 个城市可见
+      discovery_tasks: Discovery {task_count} tasks / {evidence_count} new evidence
+      country_opportunities: 国家机会点
+      all_candidate_countries: 全部候选国家
+      all_countries: 全部国家
+      all_cities_in_country: "{country} 的全部城市"
+      workspace: 工作台
+      workspace_context: 工作台上下文
+      property_dossier: 物业档案
+      back_to_list: 返回列表
+      country_scope: 国家范围
+      city_scope: 城市范围
+      search_countries: 搜索国家
+      search_cities: 搜索城市
+      back_to_countries: 返回国家列表
+      cities: 城市
+      localities: 辖区
+      no_cities_found: 未找到城市
+      locality: 辖区 / Commune
+      search_properties: 搜索物业点
+      searching_properties: 正在搜索物业点
+      no_properties_found: 未找到物业点
+      clear_search: 清除搜索
+      export_country_insight: 导出国家洞察
+      preparing_country_report: 正在准备报告
+      country_report_preparing: 最新国家报告正在准备中。
+      country_report_downloaded: 国家洞察已下载
+      no_countries_found: 未找到国家
+      no_visible_points: 无可见点位
+      no_scan_data: 无扫描数据
+      adjust_filters: 调整筛选条件，或返回全部国家。
+      no_candidates_in_db: 当前数据库中没有候选物业点。
+      property_load_failed: 物业点数据加载失败。
+      property_load_failed_body: 该国家已有候选点，请重试；当前选择不会丢失。
+      retry: 重试
+      ai_thinking: AI Thinking
+      evidence_packet_loading: 地图点位已加载，完整证据包列表仍在加载。
+      property: 物业
+      scene: 场景
+      primary_metric: 主指标
+      network_experience: 网络体验
+      ookla_tile_proxy: Ookla 瓦片 Proxy
+      network_experience_proxy_note: 瓦片级体验 Proxy，不代表室内 DAS/建设状态证据。
+      network_complaints: 网络投诉
+      property_complaint_signals: 物业级公开信号
+      complaint_signal_note: 仅展示公开网络投诉聚合，不代表室内 DAS 或建设状态证据。
+      complaint_empty: 暂无合规的物业级网络投诉数据。
+      valid_complaints: 有效投诉
+      complaint_sources: 投诉来源
+      complaint_pressure: 投诉压力
+      complaint_period: 观察窗口
+      complaint_latest: 最近观测
+      complaint_categories: 投诉分类
+      complaint_period_days: "{days} 天"
+      complaint_no_signal: 无信号
+      complaint_weak_coverage: 弱覆盖
+      complaint_slow_data: 数据慢
+      complaint_dropped_call: 掉话
+      complaint_outage: 网络中断
+      complaint_insufficient: 数据不足
+      high: 高
+      moderate: 中
+      low: 低
+      mobile_network: 移动网络
+      fixed_network: 固网/Wi-Fi
+      download_mbps: 下载 Mbps
+      upload_mbps: 上传 Mbps
+      latency_ms: 时延 ms
+      samples: 样本
+      tile_distance: 瓦片距离
+      tests_devices: "{tests} 次测试 / {devices} 台设备"
+      high_confidence: 高置信
+      medium_confidence: 中置信
+      low_confidence: 低置信
+      evidence: 证据
+      sources: 证据
+      review: 复核
+      action: 动作
+      candidates: 候选点
+      countries: 国家
+      cities: 城市
+      card: 卡片
+      dense: 紧凑
+      card_view: 卡片视图
+      dense_view: 紧凑视图
+      region_distribution: 区域分布
+      scan_maturity: 扫描成熟度
+      scan_maturity_seed: 种子扫描
+      scan_maturity_expanding: 深度扩池
+      scan_maturity_saturated: 接近饱和
+      scan_maturity_seed_help: 已建立首批候选，来源与场景仍需继续扩展。
+      scan_maturity_expanding_help: 已完成多来源或多轮扩池，但候选池尚不能视为饱和。
+      scan_maturity_saturated_help: 既定来源矩阵已连续多轮没有发现新候选点。
+      map_source: 地图来源
+      annual_visits: 年访问量
+      busy_users: 忙时用户
+      busy_traffic_gb: 忙时流量 GB
+      bandwidth_mbps: 带宽 Mbps
+      coordinate: 坐标
+      indoor_rat: 室分制式
+      action_class: 动作分类
+      next_action: 下一步动作
+      google_maps: Google 地图
+      investment_cockpit: 投资驾驶舱
+      original_evidence: 原始证据
+      evidence_translation: 证据翻译
+      inference: 推测
+      review_tab: 复核
+      rag_entry: RAG 入口
+      current_rag_context: 当前 RAG 上下文
+      question: 问题
+      send: 发送
+      retrieving: 检索中
+      ask_failed: Ask iSite2 失败
+      retrieval_ready: 可进行证据检索
+      retrieval_ready_body: 回答将包含引用来源和具体复核动作。
+      answer: 回答
+      priority: 优先级
+      review_actions: 复核动作
+      citations: 引用
+      indexed_evidence: 已索引证据
+      unknown_tier: 未知等级
+      satellite_map: 卫星机会地图
+      loading_map_engine: 正在加载地图引擎
+      street_level_satellite: 街区级卫星图
+      city_satellite: 城市卫星图
+      country_satellite: 国家卫星图
+      initializing_globe_engine: 初始化地球引擎
+      loading_country_intelligence: 加载国家情报
+      projecting_opportunity_markers: 投影机会点
+      preparing_regional_brief: 准备区域简报
+      guest_access: 游客访问
+      guest_clicks_remaining: "剩余 {count} 次点击"
+      sign_in: 登录
+      sign_out: 退出登录
+      signed_in_as: "已登录：{username}"
+      login_required: 需要登录
+      login_required_body: 游客可点击 {limit} 次。请登录后继续使用。
+      username: 用户名
+      password: 密码
+      invalid_credentials: 用户名或密码错误
+      close: 关闭
+      request_short: 提单
+      request_title: 提交需求
+      request_intro: 告诉我们需要扩充、改进或交付的内容。
+      request_type: 提单类型
+      request_scan: 增强看网
+      request_feature: 新功能建议
+      request_ppt: PPT 报告
+      request_country: 国家
+      request_country_placeholder: 搜索或输入国家
+      request_country_placeholder_existing: 搜索已有国家
+      request_use_custom_country: 使用“{value}”作为自定义国家
+      request_city_scope: 城市范围
+      request_single_city: 单一城市
+      request_national_main_cities: 全国主要城市
+      request_city: 城市
+      request_city_placeholder: 搜索或输入城市
+      request_use_custom_city: 使用“{value}”作为自定义城市
+      request_custom_location_status: 自定义条目 · 提交后核验
+      request_no_matching_locations: 没有匹配地点
+      request_location_required: 请选择或输入必要的地点。
+      request_scene: 场景
+      request_scenes: 场景
+      request_scenes_selected: 已选 {count} 个
+      request_clear_scenes: 清空
+      request_scene_required: 请至少选择一个场景。
+      request_target_count: 目标新增合格物业数
+      request_target_note: 只有新发现、通过质量门并进入 active 库的物业才计入目标。
+      request_target_total_note: 该目标为所有已选场景的合计。只有通过质量门并进入 active 库的新物业才计入。
+      request_decrease_target: 减少目标数
+      request_increase_target: 增加目标数
+      request_feature_title: 功能标题
+      request_current_workflow: 当前流程
+      request_requested_flow: 需求流程
+      request_expected_outcome: 期望效果
+      request_report_language: 报告语言
+      request_contact_email: 联系邮箱
+      request_email_note: 该邮箱仅用于发送完成通知和报告附件。
+      request_submit: 提交需求
+      request_submitting: 正在提交
+      request_submitted: 提单已提交
+      request_submitted_body: 请保留该提单编号。审批和执行完成后会通过邮件通知。
+      request_submit_another: 继续提单
+      request_submit_error: 提单提交失败。
+      request_load_options_error: 无法加载提单选项。
+      updates_short: 更新
+      updates_title: 更新通知
+      updates_intro: 最近上线的看网数据和功能更新。
+      updates_empty: 暂无已发布更新。
+      updates_load_error: 无法加载更新通知。
+      update_scan: 看网更新
+      update_feature: 功能更新
+    email:
+      request_completed_subject: "iSite2 提单 {request_code} 已完成"
+      request_completed_body: |-
+        您的 iSite2 提单 {request_code} 已完成。
+
+        完成摘要：
+        {summary}
+    excel:
+      required_sheet_keys: [main, recommendation, evidence, inference, proxy_model, review_queue, country_summary, method, airport_terminal, convention_center, mall_mixed_use, stadium, luxury_hotel_mice, office_government, hospital, university, transport_hub, mosque]
+      scene_sheet_keys: [airport_terminal, convention_center, mall_mixed_use, stadium, luxury_hotel_mice, office_government, hospital, university, transport_hub, mosque]
+      sheets:
+        main: 主表
+        recommendation: 推荐清单
+        evidence: 证据表
+        inference: 推测留痕
+        proxy_model: Proxy模型
+        review_queue: 复核队列
+        country_summary: 国家汇总
+        method: 方法说明
+        airport_terminal: 机场
+        convention_center: 会展中心
+        mall_mixed_use: 商场_Mixed_use
+        stadium: 体育场
+        luxury_hotel_mice: 酒店_MICE
+        office_government: 办公_政府
+        hospital: 医院
+        university: 大学
+        transport_hub: 交通枢纽
+        mosque: 清真寺
+      columns:
+        main: [国家, 城市, 物业名, 经度, 纬度, 场景类型, 物业点重要证据, 主指标量化值, 年访问量估计（基于Proxy）, 忙时流量（GB/h，基于Proxy）, 当前有无室分建设, 建设制式（4G/5G）, 建设运营商, 室分类型, 证据提纯批次, 证据状态, 是否被推荐, 推荐理由, 下一步核验动作, Google地图链接]
+        recommendation: [国家, 城市, 物业名, 场景类型, 推荐排名, 推荐门槛, 门槛指标, 门槛指标值, 物业点重要证据, 年访问量估计（基于Proxy）, 推荐理由, Google地图链接]
+        evidence: [行号, 国家, 城市, 物业名, 场景类型, 字段组, 原始证据, 证据翻译, 证据类型 / Proxy Basis, 证据等级, 来源1链接, 来源2链接, 交叉校验状态]
+        inference: [行号, 国家, 物业名, 推测字段, 推测值, 推测依据, 推测链路, 推测置信度]
+        proxy_model: [场景类型, 主要高价值证明指标, 面积/尺度字段, 年访问量Proxy, attach_rate, indoor_capture, busy_hour_factor, GB/user/BH]
+        review_queue: [行号, 国家, 城市, 物业名, 复核原因, 下一步动作]
+        country_summary: [国家, 候选点数量, 机场, 会展中心, 商场/Mixed-use, 体育场, 酒店/MICE, 办公/政府, 医院, 大学, 交通枢纽, 清真寺]
+      method_rows:
+        - [本轮任务范围, "{scope_text}"]
+        - [主表规则, 主表只保留物业级关键结果；通用公式和定义不逐行重复。]
+        - [排序规则, 主表按年访问量估计从高到低排序；场景分表按该场景主指标数值从高到低排序，缺失或非数值排末尾。“主指标量化值”列位于“物业点重要证据”右侧，从当前选中的物业点重要证据中提取纯数字，便于 Excel 一键排序。]
+        - [推荐门槛规则, 推荐筛选阶段对所有场景的主指标字段先做规则预识别；启用 GPT 主指标归一时，再由 GPT 将原始字段映射到当前场景允许的 canonical metric key，并经过白名单和置信度校验。推荐门槛仍使用项目级固定 First Class 门槛；未配置固定门槛的场景回退为国家+场景第10名硬主指标。推荐行在主表和各场景分表以浅黄色高亮，“是否被推荐”列填 yes，并汇总到推荐清单页签。]
+        - [证据规则, 结论必须回溯到字段级证据、来源、日期、证据等级和交叉校验状态。]
+        - [推测规则, 推测只补空字段，必须写入推测留痕，不能覆盖直接证据。]
+        - [场景建模规则, 每个场景使用独立主指标、Proxy Basis 和参数区间。]
+        - [Proxy 规则, Proxy 模型集中写入 Proxy模型 sheet。]
+        - [室分状态字段规则, 现网建设状态独立判断；Unknown 允许，空值不允许。]
+        - [输出约束, 主表固定表头；场景分表保留空表头。“主指标量化值”为数值型列，不是格式化文本复制。]
+        - [证据状态定义, Verified / Supported / Indicative / Insufficient。]
+        - [Google地图链接规则, 主表必须保留 Google地图链接。]
+    ppt:
+      title: iSite2 机会洞察卡片
+      subtitle_candidates: "{count} 个候选物业点"
+      logic_title: 规则 / 推进逻辑
+      logic_body: 证据 -> 场景模型 -> 现网状态 -> 需求测算 -> 推测留痕 -> 结论 -> 复核队列。现网室分状态与物业价值分开判断。
+      snapshot_title: 候选池快照
+      candidates: 候选点
+      direct_recommend: 直接推荐
+      survey_first: 先勘测
+      review_items: 复核项
+      location: 位置
+      scene: 场景
+      recommended_solution: 推荐方案
+      status: 状态
+      core_metric: 核心指标
+      busy_hour: 忙时
+      area_scale: 面积/尺度
+      coordinates: 坐标
+      build_status: 现网状态
+      value_judgment: 价值判断
+      risk_next_action: 风险/下一步
+      evidence_entries: 证据条数

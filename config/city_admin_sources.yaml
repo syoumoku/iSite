@@ -1,0 +1,2794 @@
+version: '2026-08-18'
+source_policy:
+  priority:
+  - national_or_local_government
+  - national_statistics_or_geographic_code
+  - official_gazette
+  unsupported_fallback: review_queue
+  fuzzy_auto_match: false
+countries:
+  Mongolia:
+    country_code: MN
+    mapping_version: unlocode-2025-1+parliament-2024-76-2025-26
+    grouping_policy: official_city_boundary_verified_property
+    sources:
+    - authority: State Great Khural of Mongolia
+      url: https://legalinfo.mn/mn/detail?lawId=17140841120651
+      date: '2025-01-24'
+      role: official_city_establishment_and_rename
+    unresolved_localities:
+      khushig valley: requires_property_boundary_verification
+    property_overrides:
+    - property_id: 77ff56ac-93c6-4117-8614-75ea8a593e00
+      property_name: Chinggis Khaan International Airport
+      scene_type: airport_terminal
+      source_city: Khushig Valley
+      city_id: MN:parliament:hunnu
+      mapping_method: official_city_boundary_point_in_polygon_reviewed
+      max_distance_km: 1.0
+    - property_id: 6b38f238-8071-4dd3-b596-575b06224283
+      property_name: Chinggis Khaan International Airport
+      scene_type: airport_terminal
+      source_city: Khushig Valley
+      city_id: MN:parliament:hunnu
+      mapping_method: official_city_boundary_point_in_polygon_reviewed
+      max_distance_km: 1.0
+    cities:
+    - city_id: MN:unlocode:uln
+      canonical_name: Ulaanbaatar
+      official_name: Ulaanbaatar
+      grouping_basis: official_trade_location
+      aliases: [Ulaanbaatar]
+      localities: []
+      reference_points:
+      - latitude: 47.916667
+        longitude: 106.916667
+        source_role: gns
+      reference_match_required: true
+      max_distance_km: 75.0
+      source:
+        authority: United Nations Economic Commission for Europe (UNECE)
+        url: https://unlocode.unece.org/publications/
+        date: '2025-1'
+    - city_id: MN:parliament:hunnu
+      canonical_name: Hunnu City
+      official_name: Хүннү хот
+      admin_area_1: Tov
+      admin_area_2: Sergelen
+      grouping_basis: statutory_city_boundary
+      aliases: [Hunnu City, Khunnu City, Хүннү хот]
+      localities: []
+      reference_points:
+      - latitude: 47.6512559
+        longitude: 106.8215825
+        source_role: reviewed_airport_terminal_inside_statutory_polygon
+      reference_match_required: true
+      max_distance_km: 1.0
+      source:
+        authority: State Great Khural of Mongolia, resolutions 2024/76 and 2025/26
+        url: https://www.parliament.mn/files/e1850d794d7745eaa3ccc55328f52811/?d=1
+        date: '2024-06-05'
+        role: official_city_boundary_annex_pages_139_to_141
+  Algeria:
+    country_code: DZ
+    grouping_policy: main_city_rollup
+    sources:
+    - authority: Ministry of Interior, Local Authorities and Transport
+      url: https://www.interieur.gov.dz/index.php/fr/component/annuaires/annuairecommunes.html
+      date: '2026-08-18'
+      role: official_local_authority_directory
+    - authority: Office National des Statistiques
+      url: https://www.ons.dz/IMG/pdf/code_geo.pdf
+      date: '2026-08-18'
+      role: official_geographic_code
+    - authority: Journal Officiel de la Republique Algerienne
+      url: https://www.joradp.dz/FTP/JO-FRANCAIS/2018/F2018078.pdf
+      date: '2018-12-26'
+      role: official_large_city_administrative_composition
+    cities:
+    - city_id: DZ:algiers
+      canonical_name: Algiers
+      official_name: Alger
+      admin_area_1: Alger
+      grouping_basis: main_city_rollup
+      aliases:
+      - Algiers
+      - Alger
+      localities:
+      - Alger Centre
+      - Bab Ezzouar
+      - Belouizdad
+      - Ben Aknoun
+      - Bologhine
+      - Cheraga
+      - Chéraga
+      - Dar El Beida
+      - Dar El Beïda
+      - Dely Ibrahim
+      - Dély Ibrahim
+      - Douera
+      - Douéra
+      - El Harrach
+      - El Madania
+      - Hydra
+      - Hussein Dey
+      - Kouba
+      - Mohammadia
+      - Mohamadia
+      - Ouled Fayet
+      - Rahmania
+      - Sidi M'Hamed
+      - Staoueli
+      - Staouéli
+      - Zeralda
+      - Zéralda
+    - city_id: DZ:oran
+      canonical_name: Oran
+      official_name: Oran
+      admin_area_1: Oran
+      grouping_basis: main_city_rollup
+      aliases:
+      - Oran
+      localities:
+      - Bir El Djir
+      - Es Senia
+    - city_id: DZ:setif
+      canonical_name: Sétif
+      official_name: Sétif
+      admin_area_1: Sétif
+      grouping_basis: official_city
+      aliases:
+      - Setif
+      - Sétif
+      localities: []
+    - city_id: DZ:bejaia
+      canonical_name: Béjaïa
+      official_name: Béjaïa
+      admin_area_1: Béjaïa
+      grouping_basis: official_city
+      aliases:
+      - Bejaia
+      - Béjaïa
+      localities: []
+    - city_id: DZ:skikda
+      canonical_name: Skikda
+      official_name: Skikda
+      admin_area_1: Skikda
+      grouping_basis: main_city_rollup
+      aliases:
+      - Skikda
+      localities:
+      - Filfila
+    - city_id: DZ:mostaganem
+      canonical_name: Mostaganem
+      official_name: Mostaganem
+      admin_area_1: Mostaganem
+      grouping_basis: main_city_rollup
+      aliases:
+      - Mostaganem
+      localities:
+      - Mazagran
+    - city_id: DZ:annaba
+      canonical_name: Annaba
+      admin_area_1: Annaba
+      grouping_basis: official_city
+      aliases:
+      - Annaba
+      localities: []
+    - city_id: DZ:batna
+      canonical_name: Batna
+      admin_area_1: Batna
+      grouping_basis: official_city
+      aliases:
+      - Batna
+      localities: []
+    - city_id: DZ:msila
+      canonical_name: M'Sila
+      admin_area_1: M'Sila
+      grouping_basis: official_city
+      aliases:
+      - M'Sila
+      - M’Sila
+      - Msila
+      localities: []
+    - city_id: DZ:ouargla
+      canonical_name: Ouargla
+      admin_area_1: Ouargla
+      grouping_basis: official_city
+      aliases:
+      - Ouargla
+      localities: []
+    - city_id: DZ:djelfa
+      canonical_name: Djelfa
+      admin_area_1: Djelfa
+      grouping_basis: official_city
+      aliases:
+      - Djelfa
+      localities: []
+    - city_id: DZ:constantine
+      canonical_name: Constantine
+      admin_area_1: Constantine
+      grouping_basis: official_city
+      aliases:
+      - Constantine
+      localities: []
+    - city_id: DZ:tizi-ouzou
+      canonical_name: Tizi Ouzou
+      admin_area_1: Tizi Ouzou
+      grouping_basis: official_city
+      aliases:
+      - Tizi Ouzou
+      localities: []
+    - city_id: DZ:bordj-bou-arreridj
+      canonical_name: Bordj Bou Arréridj
+      admin_area_1: Bordj Bou Arréridj
+      grouping_basis: official_city
+      aliases:
+      - Bordj Bou Arreridj
+      - Bordj Bou Arréridj
+      localities: []
+    - city_id: DZ:bou-saada
+      canonical_name: Bou Saâda
+      admin_area_1: M'Sila
+      grouping_basis: official_city
+      aliases:
+      - Bou Saada
+      - Bou Saâda
+      localities: []
+    - city_id: DZ:djanet
+      canonical_name: Djanet
+      admin_area_1: Djanet
+      grouping_basis: official_city
+      aliases:
+      - Djanet
+      localities: []
+    - city_id: DZ:ghardaia
+      canonical_name: Ghardaïa
+      admin_area_1: Ghardaïa
+      grouping_basis: official_city
+      aliases:
+      - Ghardaia
+      - Ghardaïa
+      localities: []
+    - city_id: DZ:guelma
+      canonical_name: Guelma
+      admin_area_1: Guelma
+      grouping_basis: official_city
+      aliases:
+      - Guelma
+      localities: []
+    - city_id: DZ:guemar
+      canonical_name: Guemar
+      admin_area_1: El Oued
+      grouping_basis: official_city
+      aliases:
+      - Guemar
+      localities: []
+    - city_id: DZ:hassi-messaoud
+      canonical_name: Hassi Messaoud
+      admin_area_1: Ouargla
+      grouping_basis: official_city
+      aliases:
+      - Hassi Messaoud
+      localities: []
+    - city_id: DZ:oumache
+      canonical_name: Oumache
+      admin_area_1: Biskra
+      grouping_basis: official_city
+      aliases:
+      - Oumache
+      localities: []
+    - city_id: DZ:sidi-bel-abbes
+      canonical_name: Sidi Bel Abbès
+      admin_area_1: Sidi Bel Abbès
+      grouping_basis: official_city
+      aliases:
+      - Sidi Bel Abbes
+      - Sidi Bel Abbès
+      localities: []
+    - city_id: DZ:taher
+      canonical_name: Taher
+      admin_area_1: Jijel
+      grouping_basis: official_city
+      aliases:
+      - Taher
+      localities: []
+    - city_id: DZ:tamanrasset
+      canonical_name: Tamanrasset
+      admin_area_1: Tamanrasset
+      grouping_basis: official_city
+      aliases:
+      - Tamanrasset
+      - Tamanghasset
+      localities: []
+    - city_id: DZ:tlemcen
+      canonical_name: Tlemcen
+      admin_area_1: Tlemcen
+      grouping_basis: official_city
+      aliases:
+      - Tlemcen
+      localities: []
+    - city_id: DZ:zenata
+      canonical_name: Zenata
+      admin_area_1: Tlemcen
+      grouping_basis: official_city
+      aliases:
+      - Zenata
+      localities: []
+  France:
+    country_code: FR
+    mapping_version: fr-insee-communes-20260825
+    grouping_policy: official_commune
+    sources:
+    - authority: Direction interministérielle du numérique (DINUM) - API Découpage administratif
+      url: https://geo.api.gouv.fr/communes
+      date: '2026-08-25'
+      role: official_insee_commune_code_and_centre
+    unresolved_localities: {}
+    property_overrides:
+    - property_id: 19865543-cd79-4277-bdfd-e21eaa40469b
+      property_name: Grenoble-Isère Airport
+      scene_type: airport_terminal
+      city_id: FR:insee:38384
+      max_distance_km: 35
+      mapping_method: official_commune_property_override
+    - property_id: 4dc08547-9292-40a1-bf06-7895d0564ce7
+      property_name: aéroport de Paris-Orly
+      scene_type: airport_terminal
+      city_id: FR:insee:94054
+      max_distance_km: 35
+      mapping_method: official_commune_property_override
+    - property_id: b2ee0227-feab-43ce-87a5-ce583a027263
+      property_name: stade Saint-Symphorien
+      scene_type: stadium
+      city_id: FR:insee:57412
+      max_distance_km: 35
+      mapping_method: official_commune_property_override
+    - property_id: 3842bbcd-155c-49b5-98d7-192fb6ec6de9
+      property_name: stade de France
+      scene_type: stadium
+      city_id: FR:insee:93066
+      max_distance_km: 35
+      mapping_method: official_commune_property_override
+    - property_id: adf25b84-73e4-46a9-bc26-05db511573d7
+      property_name: stade de biathlon Sylvie Becaert
+      scene_type: stadium
+      city_id: FR:insee:74136
+      max_distance_km: 35
+      mapping_method: official_commune_property_override
+    cities:
+    - city_id: FR:insee:2A004
+      canonical_name: Ajaccio
+      official_name: Ajaccio
+      admin_area_1: 2A
+      grouping_basis: official_commune
+      aliases:
+      - Ajaccio
+      official_exact_names:
+      - Ajaccio
+      localities: []
+      reference_match_required: true
+      max_distance_km: 11.0
+      reference_points:
+      - latitude: 41.9228
+        longitude: 8.7058
+    - city_id: FR:insee:81004
+      canonical_name: Albi
+      official_name: Albi
+      admin_area_1: '81'
+      grouping_basis: official_commune
+      aliases:
+      - Albi
+      official_exact_names:
+      - Albi
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 43.929
+        longitude: 2.1323
+    - city_id: FR:insee:49007
+      canonical_name: Angers
+      official_name: Angers
+      admin_area_1: '49'
+      grouping_basis: official_commune
+      aliases:
+      - Angers
+      official_exact_names:
+      - Angers
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 47.4819
+        longitude: -0.5629
+    - city_id: FR:insee:64024
+      canonical_name: Anglet
+      official_name: Anglet
+      admin_area_1: '64'
+      grouping_basis: official_commune
+      aliases:
+      - Anglet
+      official_exact_names:
+      - Anglet
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 43.4893
+        longitude: -1.5193
+    - city_id: FR:insee:16015
+      canonical_name: Angoulême
+      official_name: Angoulême
+      admin_area_1: '16'
+      grouping_basis: official_commune
+      aliases:
+      - Angoulême
+      official_exact_names:
+      - Angoulême
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 45.6458
+        longitude: 0.145
+    - city_id: FR:insee:74010
+      canonical_name: Annecy
+      official_name: Annecy
+      admin_area_1: '74'
+      grouping_basis: official_commune
+      aliases:
+      - Annecy
+      official_exact_names:
+      - Annecy
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 45.9024
+        longitude: 6.1264
+    - city_id: FR:insee:74012
+      canonical_name: Annemasse
+      official_name: Annemasse
+      admin_area_1: '74'
+      grouping_basis: official_commune
+      aliases:
+      - Annemasse
+      official_exact_names:
+      - Annemasse
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 46.189
+        longitude: 6.2476
+    - city_id: FR:insee:94003
+      canonical_name: Arcueil
+      official_name: Arcueil
+      admin_area_1: '94'
+      grouping_basis: official_commune
+      aliases:
+      - Arcueil
+      official_exact_names:
+      - Arcueil
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.8053
+        longitude: 2.3328
+    - city_id: FR:insee:36006
+      canonical_name: Argenton-sur-Creuse
+      official_name: Argenton-sur-Creuse
+      admin_area_1: '36'
+      grouping_basis: official_commune
+      aliases:
+      - Argenton-sur-Creuse
+      official_exact_names:
+      - Argenton-sur-Creuse
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 46.5752
+        longitude: 1.494
+    - city_id: FR:insee:93005
+      canonical_name: Aulnay-sous-Bois
+      official_name: Aulnay-sous-Bois
+      admin_area_1: '93'
+      grouping_basis: official_commune
+      aliases:
+      - Aulnay-sous-Bois
+      official_exact_names:
+      - Aulnay-sous-Bois
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.9457
+        longitude: 2.4918
+    - city_id: FR:insee:31032
+      canonical_name: Aussonne
+      official_name: Aussonne
+      admin_area_1: '31'
+      grouping_basis: official_commune
+      aliases:
+      - Aussonne
+      official_exact_names:
+      - Aussonne
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 43.6841
+        longitude: 1.3278
+    - city_id: FR:insee:89024
+      canonical_name: Auxerre
+      official_name: Auxerre
+      admin_area_1: '89'
+      grouping_basis: official_commune
+      aliases:
+      - Auxerre
+      official_exact_names:
+      - Auxerre
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 47.7939
+        longitude: 3.5821
+    - city_id: FR:insee:84007
+      canonical_name: Avignon
+      official_name: Avignon
+      admin_area_1: '84'
+      grouping_basis: official_commune
+      aliases:
+      - Avignon
+      official_exact_names:
+      - Avignon
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 43.9416
+        longitude: 4.8333
+    - city_id: FR:insee:93006
+      canonical_name: Bagnolet
+      official_name: Bagnolet
+      admin_area_1: '93'
+      grouping_basis: official_commune
+      aliases:
+      - Bagnolet
+      official_exact_names:
+      - Bagnolet
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.8671
+        longitude: 2.4252
+    - city_id: FR:insee:64102
+      canonical_name: Bayonne
+      official_name: Bayonne
+      admin_area_1: '64'
+      grouping_basis: official_commune
+      aliases:
+      - Bayonne
+      official_exact_names:
+      - Bayonne
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 43.4844
+        longitude: -1.4611
+    - city_id: FR:insee:64122
+      canonical_name: Biarritz
+      official_name: Biarritz
+      admin_area_1: '64'
+      grouping_basis: official_commune
+      aliases:
+      - Biarritz
+      official_exact_names:
+      - Biarritz
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 43.4709
+        longitude: -1.5557
+    - city_id: FR:insee:31069
+      canonical_name: Blagnac
+      official_name: Blagnac
+      admin_area_1: '31'
+      grouping_basis: official_commune
+      aliases:
+      - Blagnac
+      official_exact_names:
+      - Blagnac
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 43.641
+        longitude: 1.377
+    - city_id: FR:insee:41018
+      canonical_name: Blois
+      official_name: Blois
+      admin_area_1: '41'
+      grouping_basis: official_commune
+      aliases:
+      - Blois
+      official_exact_names:
+      - Blois
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 47.5813
+        longitude: 1.3049
+    - city_id: FR:insee:91086
+      canonical_name: Bondoufle
+      official_name: Bondoufle
+      admin_area_1: '91'
+      grouping_basis: official_commune
+      aliases:
+      - Bondoufle
+      official_exact_names:
+      - Bondoufle
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.6155
+        longitude: 2.3795
+    - city_id: FR:insee:33063
+      canonical_name: Bordeaux
+      official_name: Bordeaux
+      admin_area_1: '33'
+      grouping_basis: official_commune
+      aliases:
+      - Bordeaux
+      official_exact_names:
+      - Bordeaux
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 44.8624
+        longitude: -0.5848
+    - city_id: FR:insee:78092
+      canonical_name: Bougival
+      official_name: Bougival
+      admin_area_1: '78'
+      grouping_basis: official_commune
+      aliases:
+      - Bougival
+      official_exact_names:
+      - Bougival
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.8627
+        longitude: 2.1394
+    - city_id: FR:insee:44020
+      canonical_name: Bouguenais
+      official_name: Bouguenais
+      admin_area_1: '44'
+      grouping_basis: official_commune
+      aliases:
+      - Bouguenais
+      official_exact_names:
+      - Bouguenais
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 47.171
+        longitude: -1.6181
+    - city_id: FR:insee:01053
+      canonical_name: Bourg-en-Bresse
+      official_name: Bourg-en-Bresse
+      admin_area_1: '01'
+      grouping_basis: official_commune
+      aliases:
+      - Bourg-en-Bresse
+      official_exact_names:
+      - Bourg-en-Bresse
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 46.2027
+        longitude: 5.2469
+    - city_id: FR:insee:29019
+      canonical_name: Brest
+      official_name: Brest
+      admin_area_1: '29'
+      grouping_basis: official_commune
+      aliases:
+      - Brest
+      official_exact_names:
+      - Brest
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.4085
+        longitude: -4.4996
+    - city_id: FR:insee:19031
+      canonical_name: Brive-la-Gaillarde
+      official_name: Brive-la-Gaillarde
+      admin_area_1: '19'
+      grouping_basis: official_commune
+      aliases:
+      - Brive-la-Gaillarde
+      official_exact_names:
+      - Brive-la-Gaillarde
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 45.145
+        longitude: 1.5144
+    - city_id: FR:insee:35047
+      canonical_name: Bruz
+      official_name: Bruz
+      admin_area_1: '35'
+      grouping_basis: official_commune
+      aliases:
+      - Bruz
+      official_exact_names:
+      - Bruz
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.024
+        longitude: -1.7469
+    - city_id: FR:insee:94015
+      canonical_name: Bry-sur-Marne
+      official_name: Bry-sur-Marne
+      admin_area_1: '94'
+      grouping_basis: official_commune
+      aliases:
+      - Bry-sur-Marne
+      official_exact_names:
+      - Bry-sur-Marne
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.8392
+        longitude: 2.5224
+    - city_id: FR:insee:86041
+      canonical_name: Buxerolles
+      official_name: Buxerolles
+      admin_area_1: '86'
+      grouping_basis: official_commune
+      aliases:
+      - Buxerolles
+      official_exact_names:
+      - Buxerolles
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 46.6057
+        longitude: 0.367
+    - city_id: FR:insee:33039
+      canonical_name: Bègles
+      official_name: Bègles
+      admin_area_1: '33'
+      grouping_basis: official_commune
+      aliases:
+      - Bègles
+      official_exact_names:
+      - Bègles
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 44.803
+        longitude: -0.5485
+    - city_id: FR:insee:34032
+      canonical_name: Béziers
+      official_name: Béziers
+      admin_area_1: '34'
+      grouping_basis: official_commune
+      aliases:
+      - Béziers
+      official_exact_names:
+      - Béziers
+      localities: []
+      reference_match_required: true
+      max_distance_km: 13.0
+      reference_points:
+      - latitude: 43.3481
+        longitude: 3.2342
+    - city_id: FR:insee:14118
+      canonical_name: Caen
+      official_name: Caen
+      admin_area_1: '14'
+      grouping_basis: official_commune
+      aliases:
+      - Caen
+      official_exact_names:
+      - Caen
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 49.1846
+        longitude: -0.3722
+    - city_id: FR:insee:46042
+      canonical_name: Cahors
+      official_name: Cahors
+      admin_area_1: '46'
+      grouping_basis: official_commune
+      aliases:
+      - Cahors
+      official_exact_names:
+      - Cahors
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 44.4565
+        longitude: 1.439
+    - city_id: FR:insee:62193
+      canonical_name: Calais
+      official_name: Calais
+      admin_area_1: '62'
+      grouping_basis: official_commune
+      aliases:
+      - Calais
+      official_exact_names:
+      - Calais
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 50.9523
+        longitude: 1.869
+    - city_id: FR:insee:11069
+      canonical_name: Carcassonne
+      official_name: Carcassonne
+      admin_area_1: '11'
+      grouping_basis: official_commune
+      aliases:
+      - Carcassonne
+      - Cité de Carcassonne
+      official_exact_names:
+      - Carcassonne
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 43.2078
+        longitude: 2.3491
+    - city_id: FR:insee:95127
+      canonical_name: Cergy
+      official_name: Cergy
+      admin_area_1: '95'
+      grouping_basis: official_commune
+      aliases:
+      - Cergy
+      official_exact_names:
+      - Cergy
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 49.0373
+        longitude: 2.0455
+    - city_id: FR:insee:74056
+      canonical_name: Chamonix-Mont-Blanc
+      official_name: Chamonix-Mont-Blanc
+      admin_area_1: '74'
+      grouping_basis: official_commune
+      aliases:
+      - Chamonix-Mont-Blanc
+      official_exact_names:
+      - Chamonix-Mont-Blanc
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 45.9296
+        longitude: 6.9291
+    - city_id: FR:insee:28085
+      canonical_name: Chartres
+      official_name: Chartres
+      admin_area_1: '28'
+      grouping_basis: official_commune
+      aliases:
+      - Chartres
+      official_exact_names:
+      - Chartres
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.4481
+        longitude: 1.5046
+    - city_id: FR:insee:69271
+      canonical_name: Chassieu
+      official_name: Chassieu
+      admin_area_1: '69'
+      grouping_basis: official_commune
+      aliases:
+      - Chassieu
+      official_exact_names:
+      - Chassieu
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 45.7366
+        longitude: 4.9638
+    - city_id: FR:insee:94019
+      canonical_name: Chennevières-sur-Marne
+      official_name: Chennevières-sur-Marne
+      admin_area_1: '94'
+      grouping_basis: official_commune
+      aliases:
+      - Chennevières-sur-Marne
+      official_exact_names:
+      - Chennevières-sur-Marne
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.7951
+        longitude: 2.5443
+    - city_id: FR:insee:77111
+      canonical_name: Chessy
+      official_name: Chessy
+      admin_area_1: '77'
+      grouping_basis: official_commune
+      aliases:
+      - Chessy
+      official_exact_names:
+      - Chessy
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.8718
+        longitude: 2.7697
+    - city_id: FR:insee:94022
+      canonical_name: Choisy-le-Roi
+      official_name: Choisy-le-Roi
+      admin_area_1: '94'
+      grouping_basis: official_commune
+      aliases:
+      - Choisy-le-Roi
+      official_exact_names:
+      - Choisy-le-Roi
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.7635
+        longitude: 2.4202
+    - city_id: FR:insee:36044
+      canonical_name: Châteauroux
+      official_name: Châteauroux
+      admin_area_1: '36'
+      grouping_basis: official_commune
+      aliases:
+      - Châteauroux
+      official_exact_names:
+      - Châteauroux
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 46.8023
+        longitude: 1.6903
+    - city_id: FR:insee:63113
+      canonical_name: Clermont-Ferrand
+      official_name: Clermont-Ferrand
+      admin_area_1: '63'
+      grouping_basis: official_commune
+      aliases:
+      - Clermont-Ferrand
+      official_exact_names:
+      - Clermont-Ferrand
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 45.787
+        longitude: 3.1127
+    - city_id: FR:insee:92025
+      canonical_name: Colombes
+      official_name: Colombes
+      admin_area_1: '92'
+      grouping_basis: official_commune
+      aliases:
+      - Colombes
+      official_exact_names:
+      - Colombes
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.9218
+        longitude: 2.2469
+    - city_id: FR:insee:69299
+      canonical_name: Colombier-Saugnieu
+      official_name: Colombier-Saugnieu
+      admin_area_1: '69'
+      grouping_basis: official_commune
+      aliases:
+      - Colombier-Saugnieu
+      official_exact_names:
+      - Colombier-Saugnieu
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 45.7174
+        longitude: 5.1084
+    - city_id: FR:insee:62239
+      canonical_name: Coquelles
+      official_name: Coquelles
+      admin_area_1: '62'
+      grouping_basis: official_commune
+      aliases:
+      - Coquelles
+      official_exact_names:
+      - Coquelles
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 50.9279
+        longitude: 1.8226
+    - city_id: FR:insee:77132
+      canonical_name: Coupvray
+      official_name: Coupvray
+      admin_area_1: '77'
+      grouping_basis: official_commune
+      aliases:
+      - Coupvray
+      official_exact_names:
+      - Coupvray
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.8853
+        longitude: 2.7935
+    - city_id: FR:insee:92026
+      canonical_name: Courbevoie
+      official_name: Courbevoie
+      admin_area_1: '92'
+      grouping_basis: official_commune
+      aliases:
+      - Courbevoie
+      official_exact_names:
+      - Courbevoie
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.8976
+        longitude: 2.2574
+    - city_id: FR:insee:63124
+      canonical_name: Cournon-d'Auvergne
+      official_name: Cournon-d'Auvergne
+      admin_area_1: '63'
+      grouping_basis: official_commune
+      aliases:
+      - Cournon-d'Auvergne
+      - Cournon-d’Auvergne
+      official_exact_names:
+      - Cournon-d'Auvergne
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 45.742
+        longitude: 3.1885
+    - city_id: FR:insee:94028
+      canonical_name: Créteil
+      official_name: Créteil
+      admin_area_1: '94'
+      grouping_basis: official_commune
+      aliases:
+      - Créteil
+      official_exact_names:
+      - Créteil
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.7845
+        longitude: 2.4523
+    - city_id: FR:insee:21231
+      canonical_name: Dijon
+      official_name: Dijon
+      admin_area_1: '21'
+      grouping_basis: official_commune
+      aliases:
+      - Dijon
+      official_exact_names:
+      - Dijon
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 47.3319
+        longitude: 5.0322
+    - city_id: FR:insee:28134
+      canonical_name: Dreux
+      official_name: Dreux
+      admin_area_1: '28'
+      grouping_basis: official_commune
+      aliases:
+      - Dreux
+      official_exact_names:
+      - Dreux
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.7482
+        longitude: 1.3578
+    - city_id: FR:insee:69275
+      canonical_name: Décines-Charpieu
+      official_name: Décines-Charpieu
+      admin_area_1: '69'
+      grouping_basis: official_commune
+      aliases:
+      - Décines-Charpieu
+      official_exact_names:
+      - Décines-Charpieu
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 45.7759
+        longitude: 4.9589
+    - city_id: FR:insee:95203
+      canonical_name: Eaubonne
+      official_name: Eaubonne
+      admin_area_1: '95'
+      grouping_basis: official_commune
+      aliases:
+      - Eaubonne
+      official_exact_names:
+      - Eaubonne
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.9912
+        longitude: 2.2781
+    - city_id: FR:insee:67124
+      canonical_name: Entzheim
+      official_name: Entzheim
+      admin_area_1: '67'
+      grouping_basis: official_commune
+      aliases:
+      - Entzheim
+      official_exact_names:
+      - Entzheim
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.5353
+        longitude: 7.6341
+    - city_id: FR:insee:57207
+      canonical_name: Farébersviller
+      official_name: Farébersviller
+      admin_area_1: '57'
+      grouping_basis: official_commune
+      aliases:
+      - Farébersviller
+      official_exact_names:
+      - Farébersviller
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 49.1164
+        longitude: 6.8677
+    - city_id: FR:insee:31182
+      canonical_name: Fenouillet
+      official_name: Fenouillet
+      admin_area_1: '31'
+      grouping_basis: official_commune
+      aliases:
+      - Fenouillet
+      official_exact_names:
+      - Fenouillet
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 43.6864
+        longitude: 1.3897
+    - city_id: FR:insee:2A114
+      canonical_name: Figari
+      official_name: Figari
+      admin_area_1: 2A
+      grouping_basis: official_commune
+      aliases:
+      - Figari
+      official_exact_names:
+      - Figari
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 41.5188
+        longitude: 9.126
+    - city_id: FR:insee:45147
+      canonical_name: Fleury-les-Aubrais
+      official_name: Fleury-les-Aubrais
+      admin_area_1: '45'
+      grouping_basis: official_commune
+      aliases:
+      - Fleury-les-Aubrais
+      official_exact_names:
+      - Fleury-les-Aubrais
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 47.9449
+        longitude: 1.9223
+    - city_id: FR:insee:13039
+      canonical_name: Fos-sur-Mer
+      official_name: Fos-sur-Mer
+      admin_area_1: '13'
+      grouping_basis: official_commune
+      aliases:
+      - Fos-sur-Mer
+      official_exact_names:
+      - Fos-sur-Mer
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 43.4545
+        longitude: 4.8979
+    - city_id: FR:insee:2B120
+      canonical_name: Furiani
+      official_name: Furiani
+      admin_area_1: 2B
+      grouping_basis: official_commune
+      aliases:
+      - Furiani
+      official_exact_names:
+      - Furiani
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 42.6548
+        longitude: 9.4213
+    - city_id: FR:insee:45155
+      canonical_name: Gien
+      official_name: Gien
+      admin_area_1: '45'
+      grouping_basis: official_commune
+      aliases:
+      - Gien
+      official_exact_names:
+      - Gien
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 47.7175
+        longitude: 2.6687
+    - city_id: FR:insee:69091
+      canonical_name: Givors
+      official_name: Givors
+      admin_area_1: '69'
+      grouping_basis: official_commune
+      aliases:
+      - Givors
+      official_exact_names:
+      - Givors
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 45.5845
+        longitude: 4.7561
+    - city_id: FR:insee:38185
+      canonical_name: Grenoble
+      official_name: Grenoble
+      admin_area_1: '38'
+      grouping_basis: official_commune
+      aliases:
+      - Grenoble
+      official_exact_names:
+      - Grenoble
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 45.1842
+        longitude: 5.7155
+    - city_id: FR:insee:22070
+      canonical_name: Guingamp
+      official_name: Guingamp
+      admin_area_1: '22'
+      grouping_basis: official_commune
+      aliases:
+      - Guingamp
+      official_exact_names:
+      - Guingamp
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.5608
+        longitude: -3.1533
+    - city_id: FR:insee:29075
+      canonical_name: Guipavas
+      official_name: Guipavas
+      admin_area_1: '29'
+      grouping_basis: official_commune
+      aliases:
+      - Guipavas
+      official_exact_names:
+      - Guipavas
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.4305
+        longitude: -4.3943
+    - city_id: FR:insee:02381
+      canonical_name: Hirson
+      official_name: Hirson
+      admin_area_1: '02'
+      grouping_basis: official_commune
+      aliases:
+      - Hirson
+      official_exact_names:
+      - Hirson
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 49.938
+        longitude: 4.1132
+    - city_id: FR:insee:83069
+      canonical_name: Hyères
+      official_name: Hyères
+      admin_area_1: '83'
+      grouping_basis: official_commune
+      aliases:
+      - Hyères
+      official_exact_names:
+      - Hyères
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.5
+      reference_points:
+      - latitude: 43.1139
+        longitude: 6.2357
+    - city_id: FR:insee:94041
+      canonical_name: Ivry-sur-Seine
+      official_name: Ivry-sur-Seine
+      admin_area_1: '94'
+      grouping_basis: official_commune
+      aliases:
+      - Ivry-sur-Seine
+      official_exact_names:
+      - Ivry-sur-Seine
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.8125
+        longitude: 2.3872
+    - city_id: FR:insee:93039
+      canonical_name: L'Île-Saint-Denis
+      official_name: L'Île-Saint-Denis
+      admin_area_1: '93'
+      grouping_basis: official_commune
+      aliases:
+      - L'Île-Saint-Denis
+      official_exact_names:
+      - L'Île-Saint-Denis
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.9465
+        longitude: 2.3204
+    - city_id: FR:insee:85191
+      canonical_name: La Roche-sur-Yon
+      official_name: La Roche-sur-Yon
+      admin_area_1: '85'
+      grouping_basis: official_commune
+      aliases:
+      - La Roche-sur-Yon
+      official_exact_names:
+      - La Roche-sur-Yon
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 46.6659
+        longitude: -1.4162
+    - city_id: FR:insee:17300
+      canonical_name: La Rochelle
+      official_name: La Rochelle
+      admin_area_1: '17'
+      grouping_basis: official_commune
+      aliases:
+      - La Rochelle
+      official_exact_names:
+      - La Rochelle
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 46.162
+        longitude: -1.1765
+    - city_id: FR:insee:83144
+      canonical_name: La Valette-du-Var
+      official_name: La Valette-du-Var
+      admin_area_1: '83'
+      grouping_basis: official_commune
+      aliases:
+      - La Valette-du-Var
+      official_exact_names:
+      - La Valette-du-Var
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 43.1484
+        longitude: 5.9893
+    - city_id: FR:insee:31254
+      canonical_name: Labège
+      official_name: Labège
+      admin_area_1: '31'
+      grouping_basis: official_commune
+      aliases:
+      - Labège
+      official_exact_names:
+      - Labège
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 43.5396
+        longitude: 1.5207
+    - city_id: FR:insee:02408
+      canonical_name: Laon
+      official_name: Laon
+      admin_area_1: '02'
+      grouping_basis: official_commune
+      aliases:
+      - Laon
+      official_exact_names:
+      - Laon
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 49.5711
+        longitude: 3.613
+    - city_id: FR:insee:36018
+      canonical_name: Le Blanc
+      official_name: Le Blanc
+      admin_area_1: '36'
+      grouping_basis: official_commune
+      aliases:
+      - Le Blanc
+      official_exact_names:
+      - Le Blanc
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 46.6351
+        longitude: 1.0955
+    - city_id: FR:insee:78158
+      canonical_name: Le Chesnay-Rocquencourt
+      official_name: Le Chesnay-Rocquencourt
+      admin_area_1: '78'
+      grouping_basis: official_commune
+      aliases:
+      - Le Chesnay-Rocquencourt
+      official_exact_names:
+      - Le Chesnay-Rocquencourt
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.8285
+        longitude: 2.1188
+    - city_id: FR:insee:74136
+      canonical_name: Le Grand-Bornand
+      official_name: Le Grand-Bornand
+      admin_area_1: '74'
+      grouping_basis: official_commune
+      aliases:
+      - Le Grand-Bornand
+      official_exact_names:
+      - Le Grand-Bornand
+      localities: []
+      reference_match_required: true
+      max_distance_km: 35.0
+      reference_points:
+      - latitude: 45.9596
+        longitude: 6.4797
+    - city_id: FR:insee:76322
+      canonical_name: Le Grand-Quevilly
+      official_name: Le Grand-Quevilly
+      admin_area_1: '76'
+      grouping_basis: official_commune
+      aliases:
+      - Le Grand-Quevilly
+      official_exact_names:
+      - Le Grand-Quevilly
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 49.4118
+        longitude: 1.0416
+    - city_id: FR:insee:76351
+      canonical_name: Le Havre
+      official_name: Le Havre
+      admin_area_1: '76'
+      grouping_basis: official_commune
+      aliases:
+      - Le Havre
+      official_exact_names:
+      - Le Havre
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 49.4958
+        longitude: 0.1312
+    - city_id: FR:insee:72181
+      canonical_name: Le Mans
+      official_name: Le Mans
+      admin_area_1: '72'
+      grouping_basis: official_commune
+      aliases:
+      - Le Mans
+      official_exact_names:
+      - Le Mans
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 47.9819
+        longitude: 0.1957
+    - city_id: FR:insee:62498
+      canonical_name: Lens
+      official_name: Lens
+      admin_area_1: '62'
+      grouping_basis: official_commune
+      aliases:
+      - Lens
+      official_exact_names:
+      - Lens
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 50.4395
+        longitude: 2.8191
+    - city_id: FR:insee:13071
+      canonical_name: Les Pennes-Mirabeau
+      official_name: Les Pennes-Mirabeau
+      admin_area_1: '13'
+      grouping_basis: official_commune
+      aliases:
+      - Les Pennes-Mirabeau
+      official_exact_names:
+      - Les Pennes-Mirabeau
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 43.4005
+        longitude: 5.3222
+    - city_id: FR:insee:59343
+      canonical_name: Lesquin
+      official_name: Lesquin
+      admin_area_1: '59'
+      grouping_basis: official_commune
+      aliases:
+      - Lesquin
+      official_exact_names:
+      - Lesquin
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 50.5904
+        longitude: 3.1132
+    - city_id: FR:insee:92044
+      canonical_name: Levallois-Perret
+      official_name: Levallois-Perret
+      admin_area_1: '92'
+      grouping_basis: official_commune
+      aliases:
+      - Levallois-Perret
+      official_exact_names:
+      - Levallois-Perret
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.8946
+        longitude: 2.2874
+    - city_id: FR:insee:77251
+      canonical_name: Lieusaint
+      official_name: Lieusaint
+      admin_area_1: '77'
+      grouping_basis: official_commune
+      aliases:
+      - Lieusaint
+      official_exact_names:
+      - Lieusaint
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.6277
+        longitude: 2.549
+    - city_id: FR:insee:59350
+      canonical_name: Lille
+      official_name: Lille
+      admin_area_1: '59'
+      grouping_basis: official_commune
+      aliases:
+      - Lille
+      official_exact_names:
+      - Lille
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 50.6311
+        longitude: 3.0468
+    - city_id: FR:insee:87085
+      canonical_name: Limoges
+      official_name: Limoges
+      admin_area_1: '87'
+      grouping_basis: official_commune
+      aliases:
+      - Limoges
+      official_exact_names:
+      - Limoges
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 45.8567
+        longitude: 1.226
+    - city_id: FR:insee:14366
+      canonical_name: Lisieux
+      official_name: Lisieux
+      admin_area_1: '14'
+      grouping_basis: official_commune
+      aliases:
+      - Lisieux
+      official_exact_names:
+      - Lisieux
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 49.1478
+        longitude: 0.2426
+    - city_id: FR:insee:57412
+      canonical_name: Longeville-lès-Metz
+      official_name: Longeville-lès-Metz
+      admin_area_1: '57'
+      grouping_basis: official_commune
+      aliases:
+      - Longeville-lès-Metz
+      official_exact_names:
+      - Longeville-lès-Metz
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 49.1144
+        longitude: 6.1464
+    - city_id: FR:insee:57413
+      canonical_name: Longeville-lès-Saint-Avold
+      official_name: Longeville-lès-Saint-Avold
+      admin_area_1: '57'
+      grouping_basis: official_commune
+      aliases:
+      - Longeville-lès-Saint-Avold
+      official_exact_names:
+      - Longeville-lès-Saint-Avold
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 49.119
+        longitude: 6.6509
+    - city_id: FR:insee:56121
+      canonical_name: Lorient
+      official_name: Lorient
+      admin_area_1: '56'
+      grouping_basis: official_commune
+      aliases:
+      - Lorient
+      official_exact_names:
+      - Lorient
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 47.7494
+        longitude: -3.3799
+    - city_id: FR:insee:2B148
+      canonical_name: Lucciana
+      official_name: Lucciana
+      admin_area_1: 2B
+      grouping_basis: official_commune
+      aliases:
+      - Lucciana
+      official_exact_names:
+      - Lucciana
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 42.5393
+        longitude: 9.465
+    - city_id: FR:insee:69123
+      canonical_name: Lyon
+      official_name: Lyon
+      admin_area_1: '69'
+      grouping_basis: official_commune
+      aliases:
+      - Lyon
+      - Lyon Cedex 7
+      official_exact_names:
+      - Lyon
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 45.758
+        longitude: 4.8351
+    - city_id: FR:insee:77268
+      canonical_name: Magny-le-Hongre
+      official_name: Magny-le-Hongre
+      admin_area_1: '77'
+      grouping_basis: official_commune
+      aliases:
+      - Magny-le-Hongre
+      official_exact_names:
+      - Magny-le-Hongre
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.8675
+        longitude: 2.8171
+    - city_id: FR:insee:13054
+      canonical_name: Marignane
+      official_name: Marignane
+      admin_area_1: '13'
+      grouping_basis: official_commune
+      aliases:
+      - Marignane
+      official_exact_names:
+      - Marignane
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 43.4218
+        longitude: 5.2178
+    - city_id: FR:insee:13055
+      canonical_name: Marseille
+      official_name: Marseille
+      admin_area_1: '13'
+      grouping_basis: official_commune
+      aliases:
+      - Marseille
+      official_exact_names:
+      - Marseille
+      localities: []
+      reference_match_required: true
+      max_distance_km: 12.6
+      reference_points:
+      - latitude: 43.2803
+        longitude: 5.3806
+    - city_id: FR:insee:91377
+      canonical_name: Massy
+      official_name: Massy
+      admin_area_1: '91'
+      grouping_basis: official_commune
+      aliases:
+      - Massy
+      official_exact_names:
+      - Massy
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.7263
+        longitude: 2.2696
+    - city_id: FR:insee:34154
+      canonical_name: Mauguio
+      official_name: Mauguio
+      admin_area_1: '34'
+      grouping_basis: official_commune
+      aliases:
+      - Mauguio
+      official_exact_names:
+      - Mauguio
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 43.5915
+        longitude: 4.0128
+    - city_id: FR:insee:74176
+      canonical_name: Menthon-Saint-Bernard
+      official_name: Menthon-Saint-Bernard
+      admin_area_1: '74'
+      grouping_basis: official_commune
+      aliases:
+      - Menthon-Saint-Bernard
+      official_exact_names:
+      - Menthon-Saint-Bernard
+      localities: []
+      reference_match_required: true
+      max_distance_km: 23.3
+      reference_points:
+      - latitude: 45.867
+        longitude: 6.1917
+    - city_id: FR:insee:57463
+      canonical_name: Metz
+      official_name: Metz
+      admin_area_1: '57'
+      grouping_basis: official_commune
+      aliases:
+      - Metz
+      official_exact_names:
+      - Metz
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 49.1048
+        longitude: 6.1962
+    - city_id: FR:insee:59410
+      canonical_name: Mons-en-Barœul
+      official_name: Mons-en-Barœul
+      admin_area_1: '59'
+      grouping_basis: official_commune
+      aliases:
+      - Mons-en-Barul
+      - Mons-en-Barœul
+      official_exact_names:
+      - Mons-en-Barœul
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 50.6436
+        longitude: 3.1091
+    - city_id: FR:insee:40192
+      canonical_name: Mont-de-Marsan
+      official_name: Mont-de-Marsan
+      admin_area_1: '40'
+      grouping_basis: official_commune
+      aliases:
+      - Mont-de-Marsan
+      official_exact_names:
+      - Mont-de-Marsan
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 43.8931
+        longitude: -0.5009
+    - city_id: FR:insee:45208
+      canonical_name: Montargis
+      official_name: Montargis
+      admin_area_1: '45'
+      grouping_basis: official_commune
+      aliases:
+      - Montargis
+      official_exact_names:
+      - Montargis
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 47.9998
+        longitude: 2.7388
+    - city_id: FR:insee:82121
+      canonical_name: Montauban
+      official_name: Montauban
+      admin_area_1: '82'
+      grouping_basis: official_commune
+      aliases:
+      - Montauban
+      official_exact_names:
+      - Montauban
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 44.0217
+        longitude: 1.3646
+    - city_id: FR:insee:25388
+      canonical_name: Montbéliard
+      official_name: Montbéliard
+      admin_area_1: '25'
+      grouping_basis: official_commune
+      aliases:
+      - Montbéliard
+      official_exact_names:
+      - Montbéliard
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 47.5168
+        longitude: 6.7834
+    - city_id: FR:insee:78423
+      canonical_name: Montigny-le-Bretonneux
+      official_name: Montigny-le-Bretonneux
+      admin_area_1: '78'
+      grouping_basis: official_commune
+      aliases:
+      - Montigny-le-Bretonneux
+      official_exact_names:
+      - Montigny-le-Bretonneux
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.7776
+        longitude: 2.0252
+    - city_id: FR:insee:03185
+      canonical_name: Montluçon
+      official_name: Montluçon
+      admin_area_1: '03'
+      grouping_basis: official_commune
+      aliases:
+      - Montluçon
+      official_exact_names:
+      - Montluçon
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 46.3428
+        longitude: 2.608
+    - city_id: FR:insee:34172
+      canonical_name: Montpellier
+      official_name: Montpellier
+      admin_area_1: '34'
+      grouping_basis: official_commune
+      aliases:
+      - Montpellier
+      official_exact_names:
+      - Montpellier
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 43.61
+        longitude: 3.8742
+    - city_id: FR:insee:93048
+      canonical_name: Montreuil
+      official_name: Montreuil
+      admin_area_1: '93'
+      grouping_basis: official_commune
+      aliases:
+      - Montreuil
+      official_exact_names:
+      - Montreuil
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.8637
+        longitude: 2.4491
+    - city_id: FR:insee:92049
+      canonical_name: Montrouge
+      official_name: Montrouge
+      admin_area_1: '92'
+      grouping_basis: official_commune
+      aliases:
+      - Montrouge
+      official_exact_names:
+      - Montrouge
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.8159
+        longitude: 2.3163
+    - city_id: FR:insee:77307
+      canonical_name: Montévrain
+      official_name: Montévrain
+      admin_area_1: '77'
+      grouping_basis: official_commune
+      aliases:
+      - Montévrain
+      official_exact_names:
+      - Montévrain
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.8673
+        longitude: 2.7511
+    - city_id: FR:insee:33281
+      canonical_name: Mérignac
+      official_name: Mérignac
+      admin_area_1: '33'
+      grouping_basis: official_commune
+      aliases:
+      - Mérignac
+      official_exact_names:
+      - Mérignac
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 44.8313
+        longitude: -0.682
+    - city_id: FR:insee:54395
+      canonical_name: Nancy
+      official_name: Nancy
+      admin_area_1: '54'
+      grouping_basis: official_commune
+      aliases:
+      - Nancy
+      official_exact_names:
+      - Nancy
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.6881
+        longitude: 6.1734
+    - city_id: FR:insee:92050
+      canonical_name: Nanterre
+      official_name: Nanterre
+      admin_area_1: '92'
+      grouping_basis: official_commune
+      aliases:
+      - Nanterre
+      official_exact_names:
+      - Nanterre
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.8974
+        longitude: 2.2018
+    - city_id: FR:insee:44109
+      canonical_name: Nantes
+      official_name: Nantes
+      admin_area_1: '44'
+      grouping_basis: official_commune
+      aliases:
+      - Nantes
+      official_exact_names:
+      - Nantes
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 47.2382
+        longitude: -1.5603
+    - city_id: FR:insee:06088
+      canonical_name: Nice
+      official_name: Nice
+      admin_area_1: '06'
+      grouping_basis: official_commune
+      aliases:
+      - Nice
+      official_exact_names:
+      - Nice
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 43.7032
+        longitude: 7.2528
+    - city_id: FR:insee:93051
+      canonical_name: Noisy-le-Grand
+      official_name: Noisy-le-Grand
+      admin_area_1: '93'
+      grouping_basis: official_commune
+      aliases:
+      - Noisy-le-Grand
+      official_exact_names:
+      - Noisy-le-Grand
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.8327
+        longitude: 2.556
+    - city_id: FR:insee:30189
+      canonical_name: Nîmes
+      official_name: Nîmes
+      admin_area_1: '30'
+      grouping_basis: official_commune
+      aliases:
+      - Nîmes
+      official_exact_names:
+      - Nîmes
+      localities: []
+      reference_match_required: true
+      max_distance_km: 13.2
+      reference_points:
+      - latitude: 43.8322
+        longitude: 4.3429
+    - city_id: FR:insee:94054
+      canonical_name: Orly
+      official_name: Orly
+      admin_area_1: '94'
+      grouping_basis: official_commune
+      aliases:
+      - Orly
+      official_exact_names:
+      - Orly
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.7402
+        longitude: 2.403
+    - city_id: FR:insee:60482
+      canonical_name: Orry-la-Ville
+      official_name: Orry-la-Ville
+      admin_area_1: '60'
+      grouping_basis: official_commune
+      aliases:
+      - Orry-la-Ville
+      official_exact_names:
+      - Orry-la-Ville
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 49.1414
+        longitude: 2.5087
+    - city_id: FR:insee:75056
+      canonical_name: Paris
+      official_name: Paris
+      admin_area_1: '75'
+      grouping_basis: official_commune
+      aliases:
+      - Paris
+      official_exact_names:
+      - Paris
+      localities: []
+      reference_match_required: true
+      max_distance_km: 16.0
+      reference_points:
+      - latitude: 48.8589
+        longitude: 2.347
+    - city_id: FR:insee:64445
+      canonical_name: Pau
+      official_name: Pau
+      admin_area_1: '64'
+      grouping_basis: official_commune
+      aliases:
+      - Pau
+      official_exact_names:
+      - Pau
+      localities: []
+      reference_match_required: true
+      max_distance_km: 11.9
+      reference_points:
+      - latitude: 43.3219
+        longitude: -0.3435
+    - city_id: FR:insee:66136
+      canonical_name: Perpignan
+      official_name: Perpignan
+      admin_area_1: '66'
+      grouping_basis: official_commune
+      aliases:
+      - Perpignan
+      official_exact_names:
+      - Perpignan
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 42.699
+        longitude: 2.9045
+    - city_id: FR:insee:78490
+      canonical_name: Plaisir
+      official_name: Plaisir
+      admin_area_1: '78'
+      grouping_basis: official_commune
+      aliases:
+      - Plaisir
+      official_exact_names:
+      - Plaisir
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.8129
+        longitude: 1.9483
+    - city_id: FR:insee:92062
+      canonical_name: Puteaux
+      official_name: Puteaux
+      admin_area_1: '92'
+      grouping_basis: official_commune
+      aliases:
+      - Puteaux
+      official_exact_names:
+      - Puteaux
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.8824
+        longitude: 2.2384
+    - city_id: FR:insee:51454
+      canonical_name: Reims
+      official_name: Reims
+      admin_area_1: '51'
+      grouping_basis: official_commune
+      aliases:
+      - Reims
+      official_exact_names:
+      - Reims
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 49.2535
+        longitude: 4.0551
+    - city_id: FR:insee:35238
+      canonical_name: Rennes
+      official_name: Rennes
+      admin_area_1: '35'
+      grouping_basis: official_commune
+      aliases:
+      - Rennes
+      official_exact_names:
+      - Rennes
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.1159
+        longitude: -1.6884
+    - city_id: FR:insee:95527
+      canonical_name: Roissy-en-France
+      official_name: Roissy-en-France
+      admin_area_1: '95'
+      grouping_basis: official_commune
+      aliases:
+      - Roissy-en-France
+      official_exact_names:
+      - Roissy-en-France
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 49.0036
+        longitude: 2.5188
+    - city_id: FR:insee:76540
+      canonical_name: Rouen
+      official_name: Rouen
+      admin_area_1: '76'
+      grouping_basis: official_commune
+      aliases:
+      - Rouen
+      official_exact_names:
+      - Rouen
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 49.4412
+        longitude: 1.0912
+    - city_id: FR:insee:93066
+      canonical_name: Saint-Denis
+      official_name: Saint-Denis
+      admin_area_1: '93'
+      grouping_basis: official_commune
+      aliases:
+      - Saint-Denis
+      official_exact_names:
+      - Saint-Denis
+      localities: []
+      reference_match_required: true
+      max_distance_km: 35.0
+      reference_points:
+      - latitude: 48.9378
+        longitude: 2.3657
+    - city_id: FR:insee:44162
+      canonical_name: Saint-Herblain
+      official_name: Saint-Herblain
+      admin_area_1: '44'
+      grouping_basis: official_commune
+      aliases:
+      - Saint-Herblain
+      official_exact_names:
+      - Saint-Herblain
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 47.2246
+        longitude: -1.6306
+    - city_id: FR:insee:35281
+      canonical_name: Saint-Jacques-de-la-Lande
+      official_name: Saint-Jacques-de-la-Lande
+      admin_area_1: '35'
+      grouping_basis: official_commune
+      aliases:
+      - Saint-Jacques-de-la-Lande
+      official_exact_names:
+      - Saint-Jacques-de-la-Lande
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.0779
+        longitude: -1.7252
+    - city_id: FR:insee:06123
+      canonical_name: Saint-Laurent-du-Var
+      official_name: Saint-Laurent-du-Var
+      admin_area_1: '06'
+      grouping_basis: official_commune
+      aliases:
+      - Saint-Laurent-du-Var
+      official_exact_names:
+      - Saint-Laurent-du-Var
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 43.6865
+        longitude: 7.1822
+    - city_id: FR:insee:68297
+      canonical_name: Saint-Louis
+      official_name: Saint-Louis
+      admin_area_1: '68'
+      grouping_basis: official_commune
+      aliases:
+      - Saint-Louis
+      official_exact_names:
+      - Saint-Louis
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 47.5986
+        longitude: 7.543
+    - city_id: FR:insee:64496
+      canonical_name: Saint-Pierre-d'Irube
+      official_name: Saint-Pierre-d'Irube
+      admin_area_1: '64'
+      grouping_basis: official_commune
+      aliases:
+      - Saint-Pierre-d'Irube
+      official_exact_names:
+      - Saint-Pierre-d'Irube
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 43.4628
+        longitude: -1.4447
+    - city_id: FR:insee:42218
+      canonical_name: Saint-Étienne
+      official_name: Saint-Étienne
+      admin_area_1: '42'
+      grouping_basis: official_commune
+      aliases:
+      - Saint-Étienne
+      official_exact_names:
+      - Saint-Étienne
+      localities: []
+      reference_match_required: true
+      max_distance_km: 16.4
+      reference_points:
+      - latitude: 45.4241
+        longitude: 4.3665
+    - city_id: FR:insee:38384
+      canonical_name: Saint-Étienne-de-Saint-Geoirs
+      official_name: Saint-Étienne-de-Saint-Geoirs
+      admin_area_1: '38'
+      grouping_basis: official_commune
+      aliases:
+      - Saint-Étienne-de-Saint-Geoirs
+      official_exact_names:
+      - Saint-Étienne-de-Saint-Geoirs
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 45.3468
+        longitude: 5.3504
+    - city_id: FR:insee:76575
+      canonical_name: Saint-Étienne-du-Rouvray
+      official_name: Saint-Étienne-du-Rouvray
+      admin_area_1: '76'
+      grouping_basis: official_commune
+      aliases:
+      - Saint-Étienne-du-Rouvray
+      official_exact_names:
+      - Saint-Étienne-du-Rouvray
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 49.3833
+        longitude: 1.0909
+    - city_id: FR:insee:57631
+      canonical_name: Sarreguemines
+      official_name: Sarreguemines
+      admin_area_1: '57'
+      grouping_basis: official_commune
+      aliases:
+      - Sarreguemines
+      official_exact_names:
+      - Sarreguemines
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 49.106
+        longitude: 7.0709
+    - city_id: FR:insee:08409
+      canonical_name: Sedan
+      official_name: Sedan
+      admin_area_1: 08
+      grouping_basis: official_commune
+      aliases:
+      - Sedan
+      official_exact_names:
+      - Sedan
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 49.6993
+        longitude: 4.9269
+    - city_id: FR:insee:77449
+      canonical_name: Serris
+      official_name: Serris
+      admin_area_1: '77'
+      grouping_basis: official_commune
+      aliases:
+      - Serris
+      official_exact_names:
+      - Serris
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.8453
+        longitude: 2.7873
+    - city_id: FR:insee:67482
+      canonical_name: Strasbourg
+      official_name: Strasbourg
+      admin_area_1: '67'
+      grouping_basis: official_commune
+      aliases:
+      - Strasbourg
+      official_exact_names:
+      - Strasbourg
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.5691
+        longitude: 7.7621
+    - city_id: FR:insee:65440
+      canonical_name: Tarbes
+      official_name: Tarbes
+      admin_area_1: '65'
+      grouping_basis: official_commune
+      aliases:
+      - Tarbes
+      official_exact_names:
+      - Tarbes
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 43.2387
+        longitude: 0.0653
+    - city_id: FR:insee:94073
+      canonical_name: Thiais
+      official_name: Thiais
+      admin_area_1: '94'
+      grouping_basis: official_commune
+      aliases:
+      - Thiais
+      official_exact_names:
+      - Thiais
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.7605
+        longitude: 2.3869
+    - city_id: FR:insee:60639
+      canonical_name: Tillé
+      official_name: Tillé
+      admin_area_1: '60'
+      grouping_basis: official_commune
+      aliases:
+      - Tillé
+      official_exact_names:
+      - Tillé
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 49.4669
+        longitude: 2.1204
+    - city_id: FR:insee:54526
+      canonical_name: Tomblaine
+      official_name: Tomblaine
+      admin_area_1: '54'
+      grouping_basis: official_commune
+      aliases:
+      - Tomblaine
+      official_exact_names:
+      - Tomblaine
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.6851
+        longitude: 6.2212
+    - city_id: FR:insee:83137
+      canonical_name: Toulon
+      official_name: Toulon
+      admin_area_1: '83'
+      grouping_basis: official_commune
+      aliases:
+      - Toulon
+      official_exact_names:
+      - Toulon
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 43.1364
+        longitude: 5.9334
+    - city_id: FR:insee:31555
+      canonical_name: Toulouse
+      official_name: Toulouse
+      admin_area_1: '31'
+      grouping_basis: official_commune
+      aliases:
+      - Toulouse
+      official_exact_names:
+      - Toulouse
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 43.6007
+        longitude: 1.4328
+    - city_id: FR:insee:37261
+      canonical_name: Tours
+      official_name: Tours
+      admin_area_1: '37'
+      grouping_basis: official_commune
+      aliases:
+      - Tours
+      official_exact_names:
+      - Tours
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 47.3943
+        longitude: 0.6949
+    - city_id: FR:insee:93073
+      canonical_name: Tremblay-en-France
+      official_name: Tremblay-en-France
+      admin_area_1: '93'
+      grouping_basis: official_commune
+      aliases:
+      - Tremblay-en-France
+      official_exact_names:
+      - Tremblay-en-France
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.9744
+        longitude: 2.5481
+    - city_id: FR:insee:10387
+      canonical_name: Troyes
+      official_name: Troyes
+      admin_area_1: '10'
+      grouping_basis: official_commune
+      aliases:
+      - Troyes
+      official_exact_names:
+      - Troyes
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.2924
+        longitude: 4.0761
+    - city_id: FR:insee:26362
+      canonical_name: Valence
+      official_name: Valence
+      admin_area_1: '26'
+      grouping_basis: official_commune
+      aliases:
+      - Valence
+      official_exact_names:
+      - Valence
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 44.9234
+        longitude: 4.9164
+    - city_id: FR:insee:59606
+      canonical_name: Valenciennes
+      official_name: Valenciennes
+      admin_area_1: '59'
+      grouping_basis: official_commune
+      aliases:
+      - Valenciennes
+      official_exact_names:
+      - Valenciennes
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 50.362
+        longitude: 3.5142
+    - city_id: FR:insee:78646
+      canonical_name: Versailles
+      official_name: Versailles
+      admin_area_1: '78'
+      grouping_basis: official_commune
+      aliases:
+      - Versailles
+      official_exact_names:
+      - Versailles
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.8039
+        longitude: 2.1191
+    - city_id: FR:insee:59009
+      canonical_name: Villeneuve-d'Ascq
+      official_name: Villeneuve-d'Ascq
+      admin_area_1: '59'
+      grouping_basis: official_commune
+      aliases:
+      - Villeneuve-d'Ascq
+      official_exact_names:
+      - Villeneuve-d'Ascq
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 50.6362
+        longitude: 3.1619
+    - city_id: FR:insee:92078
+      canonical_name: Villeneuve-la-Garenne
+      official_name: Villeneuve-la-Garenne
+      admin_area_1: '92'
+      grouping_basis: official_commune
+      aliases:
+      - Villeneuve-la-Garenne
+      official_exact_names:
+      - Villeneuve-la-Garenne
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.9354
+        longitude: 2.3231
+    - city_id: FR:insee:13117
+      canonical_name: Vitrolles
+      official_name: Vitrolles
+      admin_area_1: '13'
+      grouping_basis: official_commune
+      aliases:
+      - Vitrolles
+      official_exact_names:
+      - Vitrolles
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 43.4509
+        longitude: 5.2656
+    - city_id: FR:insee:59650
+      canonical_name: Wattrelos
+      official_name: Wattrelos
+      admin_area_1: '59'
+      grouping_basis: official_commune
+      aliases:
+      - Wattrelos
+      official_exact_names:
+      - Wattrelos
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 50.7125
+        longitude: 3.2159
+    - city_id: FR:insee:95218
+      canonical_name: Éragny-sur-Oise
+      official_name: Éragny-sur-Oise
+      admin_area_1: '95'
+      grouping_basis: official_commune
+      aliases:
+      - Éragny-sur-Oise
+      official_exact_names:
+      - Éragny-sur-Oise
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 49.0224
+        longitude: 2.1002
+    - city_id: FR:insee:74119
+      canonical_name: Évian-les-Bains
+      official_name: Évian-les-Bains
+      admin_area_1: '74'
+      grouping_basis: official_commune
+      aliases:
+      - Évian-les-Bains
+      official_exact_names:
+      - Évian-les-Bains
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 46.3911
+        longitude: 6.5911
+    - city_id: FR:insee:91228
+      canonical_name: Évry-Courcouronnes
+      official_name: Évry-Courcouronnes
+      admin_area_1: '91'
+      grouping_basis: official_commune
+      aliases:
+      - Courcouronnes
+      - Évry-Courcouronnes
+      official_exact_names:
+      - Évry-Courcouronnes
+      localities: []
+      reference_match_required: true
+      max_distance_km: 10.0
+      reference_points:
+      - latitude: 48.6287
+        longitude: 2.4313

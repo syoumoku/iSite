@@ -1,0 +1,70 @@
+version: complaint_sources.v1
+default_policy: deny
+requirements:
+  - no_login
+  - no_captcha
+  - no_paywall
+  - robots_allowed
+  - terms_allow_automation
+source_approval_contract:
+  approval_status: approved
+  required_metadata:
+    - automation_allowed
+    - robots_allowed
+    - terms_allow_automation
+    - no_login_required
+    - last_verified_at
+    - verification_url
+property_level_sources: []
+regional_baselines:
+  - name: Consumidor.gov.br Open Data
+    url: https://www.consumidor.gov.br/pages/dadosabertos/externo/
+    publication_index_url: https://www.consumidor.gov.br/pages/publicacao/externo/publicacoes.json?indicadorTipoPublicacao=2
+    scope: municipality_operator_baseline_only
+    property_level_evidence: false
+    narrative_text_available: false
+    personal_information_allowed: false
+    approval_status: approved
+    automation_allowed: true
+    no_login_required: true
+    last_verified_at: "2026-07-27"
+    verification_url: https://www.consumidor.gov.br/pages/conteudo/publico/1
+  - name: Anatel Open Data
+    url: https://www.gov.br/anatel/pt-br/dados/dados-abertos
+    scope: city_operator_baseline_only
+    property_level_evidence: false
+  - name: Anatel RQUAL Quality and Complaint Indices
+    url: https://www.gov.br/anatel/pt-br/dados/qualidade/qualidade-dos-servicos/regulamento
+    scope: municipality_operator_service_baseline_only
+    property_level_evidence: false
+localized_search:
+  Brazil:
+    languages: [pt-BR, pt, en]
+    required_context: [canonical_property_name, city]
+    terms:
+      - sem sinal
+      - sinal fraco
+      - internet lenta
+      - dados móveis lentos
+      - queda de chamada
+      - rede caiu
+      - 4G
+      - 5G
+    query_templates:
+      - '"{property_name}" "{city}" "{term}"'
+      - 'site:{approved_domain} "{property_name}" "{city}" "{term}"'
+    acquisition:
+      entrypoint: scripts/run_firecrawl_cli.py
+      deployment_default: local
+      retain_search_manifest: true
+      retain_scrape_manifest: true
+rejected_source_patterns:
+  - login
+  - signin
+  - captcha
+  - account
+  - checkout
+retention:
+  store_sanitized_text_only: true
+  public_raw_text: false
+  public_personal_information: false

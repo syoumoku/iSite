@@ -28,6 +28,10 @@ from isite2.domain.enums import (
 )
 from isite2.rules.config_loader import get_scene_rule, scene_definitions
 from isite2.rules.demand import calculate_demand, demand_params_from_scene_rule
+from isite2.rules.metric_safety import (
+    is_year_like_annual_visit,
+    safe_annual_visit_estimate,
+)
 from isite2.rules.reason import short_reason
 
 LOW_EVIDENCE_LABEL = "low_primary_metric_evidence"
@@ -52,12 +56,28 @@ QUANTITATIVE_PRIMARY: dict[str, list[str]] = {
     ],
     "stadium": ["seat_count", "event_days", "international_events", "peak_event_capacity"],
     "luxury_hotel_mice": ["keys", "rooms", "meeting_ballroom_area", "ballroom_capacity"],
-    "mall_mixed_use": ["gla", "retail_gfa", "annual_footfall", "footfall"],
-    "office_government": ["office_nla", "office_gfa"],
-    "hospital": ["beds", "outpatient_volume"],
+    "mall_mixed_use": ["annual_footfall", "footfall", "gla", "retail_gfa"],
+    "office_government": [
+        "office_nla",
+        "office_gfa",
+        "floor_count",
+        "tower_height",
+        "building_grade",
+    ],
+    "hospital": ["beds", "outpatient_volume", "staff_count", "employee_count"],
     "university": ["enrollment", "students", "student_count", "campus_population"],
     "transport_hub": ["daily_ridership", "ridership", "interchange_volume", "line_count"],
     "cruise_port": ["passenger_throughput", "annual_passenger_throughput"],
+    "mosque": [
+        "mosque_area",
+        "gross_floor_area",
+        "prayer_hall_area",
+        "annual_visitors",
+        "annual_visits",
+        "daily_visitors",
+        "annual_footfall",
+        "footfall",
+    ],
 }
 
 ANNUAL_VISIT_FIELDS = {
@@ -65,8 +85,19 @@ ANNUAL_VISIT_FIELDS = {
     "passenger_throughput",
     "annual_footfall",
     "footfall",
+    "annual_visitors",
+    "annual_visits",
 }
-DAILY_VISIT_FIELDS = {"daily_ridership", "ridership"}
+DAILY_VISIT_FIELDS = {"daily_ridership", "ridership", "daily_visitors"}
+VISIT_VOLUME_FIELDS = {"outpatient_volume", "interchange_volume"}
+VISIT_METRIC_FIELDS = ANNUAL_VISIT_FIELDS | DAILY_VISIT_FIELDS | VISIT_VOLUME_FIELDS
+VISITOR_PRIMARY_SCENES = {
+    "airport_terminal",
+    "mall_mixed_use",
+    "transport_hub",
+    "cruise_port",
+    "mosque",
+}
 AREA_FIELDS = {
     "exhibition_area",
     "meeting_area",
@@ -75,14 +106,22 @@ AREA_FIELDS = {
     "retail_gfa",
     "office_nla",
     "office_gfa",
+    "mosque_area",
+    "gross_floor_area",
+    "prayer_hall_area",
+    "site_area",
+    "built_up_area",
 }
 ROOM_FIELDS = {"keys", "rooms"}
+STAFF_COUNT_FIELDS = {"staff_count", "employee_count"}
 PEOPLE_CAPACITY_FIELDS = {
     "seat_count",
     "peak_event_capacity",
     "plenary_capacity",
     "ballroom_capacity",
 }
+FLOOR_COUNT_FIELDS = {"floor_count"}
+HEIGHT_FIELDS = {"tower_height"}
 
 
 class DerivedInfoProvider(Protocol):
@@ -201,7 +240,7 @@ class OpenAIDerivedInfoProvider:
 class RuleSafetyFallbackProvider:
     """Local fallback used for tests and for environments without a GPT key.
 
-    Production refresh should use OpenAIDerivedInfoProvider. This provider keeps the
+    Production refresh should use CodexOAuthDerivedInfoProvider. This provider keeps the
     pipeline usable and lets quality gates prove that GPT output is not blindly trusted.
     """
 
@@ -386,6 +425,7 @@ def refresh_active_derived_info(
     engine: Engine,
     *,
     scan_run_id: str | None = None,
+    property_ids: list[str] | None = None,
     provider: DerivedInfoProvider | None = None,
     provider_mode: str | None = None,
     limit: int | None = None,
@@ -395,8 +435,9 @@ def refresh_active_derived_info(
 ) -> dict[str, Any]:
     """Refresh latest active derived fields from objective evidence.
 
-    GPT is used when provider_mode is "gpt" or when provider_mode is "auto" and an
-    OpenAI key is configured. Rule fallback is only a local safety fallback.
+    GPT is used through Codex OAuth by default. OpenAI API key mode is available only
+    when provider_mode is explicitly "gpt". Rule fallback is only a local safety
+    fallback.
     """
     active_provider = provider or _provider_from_mode(
         provider_mode,
@@ -405,6 +446,11 @@ def refresh_active_derived_info(
     with engine.begin() as connection:
         _ensure_derived_refresh_status_schema(connection)
         targets = _latest_targets(connection, scan_run_id=scan_run_id)
+        if property_ids:
+            property_id_set = set(property_ids)
+            targets = [
+                target for target in targets if target["property_id"] in property_id_set
+            ]
         if limit is not None:
             targets = targets[:limit]
         evidence = _evidence_pool(connection, [target["property_id"] for target in targets])
@@ -459,11 +505,27 @@ def refresh_active_derived_info(
         cached_decision = None
         if not force:
             with engine.begin() as connection:
-                cached_decision = _cached_decision_for_evidence(
-                    connection,
-                    property_id=target["property_id"],
-                    evidence_package_hash=evidence_package_hash,
-                )
+                compatible_hashes = [
+                    evidence_package_hash,
+                    _legacy_evidence_package_hash(target, evidence_rows),
+                ]
+                source_city = target.get("source_city_before_normalization")
+                if source_city and source_city != target.get("city"):
+                    compatible_hashes.append(
+                        _legacy_evidence_package_hash(
+                            target,
+                            evidence_rows,
+                            city=str(source_city),
+                        )
+                    )
+                for compatible_hash in dict.fromkeys(compatible_hashes):
+                    cached_decision = _cached_decision_for_evidence(
+                        connection,
+                        property_id=target["property_id"],
+                        evidence_package_hash=compatible_hash,
+                    )
+                    if cached_decision is not None:
+                        break
         if cached_decision is not None:
             decision = cached_decision
             decision["cache_status"] = "db_evidence_hash_hit"
@@ -492,7 +554,7 @@ def refresh_active_derived_info(
             if decision.get("cache_status") == "hit":
                 counts["file_cache_hit_count"] += 1
             else:
-                counts["gpt_analysis_requested_count"] += 1
+                _increment_provider_request_count(counts, active_provider)
             persist_decision(target, evidence_rows, evidence_package_hash, decision)
     else:
         with ThreadPoolExecutor(max_workers=concurrency) as executor:
@@ -520,14 +582,30 @@ def refresh_active_derived_info(
                 if decision.get("cache_status") == "hit":
                     counts["file_cache_hit_count"] += 1
                 else:
-                    counts["gpt_analysis_requested_count"] += 1
+                    _increment_provider_request_count(counts, active_provider)
                 persist_decision(target, evidence_rows, evidence_package_hash, decision)
-    after = _qa_summary(targets, evidence)
+    with engine.begin() as connection:
+        after_targets = _latest_targets(connection, scan_run_id=scan_run_id)
+        if property_ids:
+            property_id_set = set(property_ids)
+            after_targets = [
+                target
+                for target in after_targets
+                if target["property_id"] in property_id_set
+            ]
+        if limit is not None:
+            after_targets = after_targets[:limit]
+        after_evidence = _evidence_pool(
+            connection,
+            [target["property_id"] for target in after_targets],
+        )
+        after = _qa_summary(after_targets, after_evidence)
     return {
         "mode": "gpt_derived_info_refresh",
         "provider": active_provider.provider_name,
         "timestamp_utc": datetime.now(UTC).isoformat(),
         "scan_run_id": scan_run_id,
+        "property_ids": property_ids,
         "target_count": len(targets),
         "counts": dict(counts),
         "error_count": len(errors),
@@ -543,7 +621,9 @@ def _provider_from_mode(
     *,
     cache_dir: Path | None,
 ) -> DerivedInfoProvider:
-    selected = (mode or os.getenv("ISITE2_DERIVED_REFRESH_PROVIDER") or "auto").strip().lower()
+    selected = (
+        mode or os.getenv("ISITE2_DERIVED_REFRESH_PROVIDER") or "codex-oauth"
+    ).strip().lower()
     if selected == "rule":
         return RuleSafetyFallbackProvider()
     if selected == "codex-oauth":
@@ -554,9 +634,6 @@ def _provider_from_mode(
         return FileCachedDerivedInfoProvider(provider, cache_dir) if cache_dir else provider
     if selected != "auto":
         raise ValueError("provider_mode must be one of: auto, gpt, codex-oauth, rule")
-    if os.getenv("OPENAI_API_KEY") or os.getenv("ISITE2_OPENAI_API_KEY"):
-        provider = OpenAIDerivedInfoProvider()
-        return FileCachedDerivedInfoProvider(provider, cache_dir) if cache_dir else provider
     if (Path.home() / ".codex" / "auth.json").exists():
         provider = CodexOAuthDerivedInfoProvider()
         return FileCachedDerivedInfoProvider(provider, cache_dir) if cache_dir else provider
@@ -618,10 +695,22 @@ def _latest_targets(connection, *, scan_run_id: str | None) -> list[dict[str, An
             text(
                 """
                 SELECT p.id AS property_id, p.country, p.city, p.canonical_name,
-                       p.scene_type, sc.scan_run_id, sm.annual_visits_est,
-                       sm.metric_availability_level
+                       pca.source_city AS source_city_before_normalization,
+                       p.scene_type, sc.scan_run_id, sm.area_metric_name,
+                       sm.area_metric_value, sm.area_metric_unit,
+                       sm.annual_visits_raw, sm.annual_visits_est,
+                       sm.metric_availability_level,
+                       EXISTS (
+                         SELECT 1
+                         FROM review_queue rq
+                         WHERE rq.property_id = p.id
+                           AND rq.scan_run_id = sc.scan_run_id
+                           AND rq.review_type = 'designated_lead_primary_metric'
+                           AND rq.status = 'open'
+                       ) AS designated_missing_primary_metric
                 FROM scan_candidates sc
                 JOIN properties p ON p.id = sc.property_id
+                LEFT JOIN property_city_assignments pca ON pca.property_id = p.id
                 LEFT JOIN scene_model_results sm
                   ON sm.property_id = p.id AND sm.scan_run_id = sc.scan_run_id
                 WHERE sc.property_id IS NOT NULL
@@ -645,10 +734,22 @@ def _latest_targets(connection, *, scan_run_id: str | None) -> list[dict[str, An
                   WHERE sc.property_id IS NOT NULL
                 )
                 SELECT p.id AS property_id, p.country, p.city, p.canonical_name,
-                       p.scene_type, latest.scan_run_id, sm.annual_visits_est,
-                       sm.metric_availability_level
+                       pca.source_city AS source_city_before_normalization,
+                       p.scene_type, latest.scan_run_id, sm.area_metric_name,
+                       sm.area_metric_value, sm.area_metric_unit,
+                       sm.annual_visits_raw, sm.annual_visits_est,
+                       sm.metric_availability_level,
+                       EXISTS (
+                         SELECT 1
+                         FROM review_queue rq
+                         WHERE rq.property_id = p.id
+                           AND rq.scan_run_id = latest.scan_run_id
+                           AND rq.review_type = 'designated_lead_primary_metric'
+                           AND rq.status = 'open'
+                       ) AS designated_missing_primary_metric
                 FROM latest
                 JOIN properties p ON p.id = latest.property_id
+                LEFT JOIN property_city_assignments pca ON pca.property_id = p.id
                 LEFT JOIN scene_model_results sm
                   ON sm.property_id = p.id AND sm.scan_run_id = latest.scan_run_id
                 WHERE latest.rn = 1
@@ -664,7 +765,7 @@ def _evidence_pool(connection, property_ids: list[str]) -> dict[str, list[dict[s
         return {}
     statement = text(
         """
-        SELECT property_id, field_group, indicator_name, field_value, unit,
+        SELECT id AS evidence_id, property_id, field_group, indicator_name, field_value, unit,
                evidence_type, source_name, source_tier, source_url, source_date
         FROM evidence_items
         WHERE property_id IN :property_ids
@@ -791,6 +892,14 @@ def _should_persist_decision(provider: DerivedInfoProvider) -> bool:
     return "rule_safety_fallback" not in provider.provider_name
 
 
+def _increment_provider_request_count(counts: Counter, provider: DerivedInfoProvider) -> None:
+    name = provider.provider_name.casefold()
+    if any(token in name for token in ("gpt", "codex", "openai")):
+        counts["gpt_analysis_requested_count"] += 1
+    else:
+        counts["rule_analysis_requested_count"] += 1
+
+
 def _derive_from_decision(
     target: dict[str, Any],
     evidence_rows: list[dict[str, Any]],
@@ -799,6 +908,7 @@ def _derive_from_decision(
     scene_type = target["scene_type"]
     scene_rule = get_scene_rule(scene_type)
     objective_metric = _best_metric(scene_type, evidence_rows)
+    visit_metric = _best_visit_metric(scene_type, evidence_rows)
     source_domains = {
         _domain(row.get("source_url"))
         for row in evidence_rows
@@ -810,32 +920,48 @@ def _derive_from_decision(
 
     has_hard_primary = objective_metric is not None
     selected_metric = objective_metric if has_hard_primary else None
+    if _should_select_visit_metric_as_primary(scene_type, selected_metric, visit_metric):
+        selected_metric = visit_metric
     if (
         decision_metric
         and objective_metric
         and decision_metric.field_key == objective_metric.field_key
+        and not _should_select_visit_metric_as_primary(
+            scene_type,
+            objective_metric,
+            visit_metric,
+        )
     ):
         selected_metric = objective_metric
 
     current_annual = _float_or_none(target.get("annual_visits_est"))
     gpt_annual = _float_or_none(decision.get("annual_visits_est"))
-    proxy_annual = _annual_visits_from_metric(scene_type, selected_metric)
+    annual_metric = visit_metric or selected_metric
+    proxy_annual = _annual_visits_from_metric(scene_type, annual_metric)
     fallback_annual = proxy_annual.value if proxy_annual is not None else None
-    if not selected_metric:
+    if not annual_metric:
         annual_est = None
-    elif selected_metric.field_key in ANNUAL_VISIT_FIELDS:
-        annual_est = gpt_annual or selected_metric.numeric_value
+    elif _is_direct_annual_visit_metric(annual_metric):
+        annual_est = annual_metric.numeric_value
+    elif annual_metric.field_key == "line_count":
+        annual_est = None
+    elif (
+        scene_type == "airport_terminal"
+        and annual_metric.field_key == "terminal_capacity"
+    ):
+        annual_est = (
+            gpt_annual
+            if gpt_annual is not None and not _is_year_like_annual_visit(gpt_annual)
+            else None
+        )
     elif fallback_annual is not None:
         annual_est = fallback_annual
     else:
         annual_est = gpt_annual or current_annual
+    annual_est = _safe_annual_visit_estimate(annual_est)
     if annual_est is not None and annual_est <= 0:
         annual_est = None
-    annual_raw = (
-        annual_est
-        if selected_metric and selected_metric.field_key in ANNUAL_VISIT_FIELDS
-        else None
-    )
+    annual_raw = annual_est if _is_direct_annual_visit_metric(annual_metric) else None
 
     if not selected_metric:
         has_hard_primary = False
@@ -859,6 +985,9 @@ def _derive_from_decision(
         if has_hard_primary
         else EvidenceStatus.INSUFFICIENT.value
     )
+    designated_missing_primary_metric = bool(
+        target.get("designated_missing_primary_metric")
+    )
     action_class = (
         _valid_choice(
             decision.get("action_class"),
@@ -866,13 +995,19 @@ def _derive_from_decision(
             ActionClass.SURVEY_FIRST.value,
         )
         if has_hard_primary
-        else ActionClass.REVIEW_QUEUE.value
+        else (
+            ActionClass.SURVEY_FIRST.value
+            if designated_missing_primary_metric
+            else ActionClass.REVIEW_QUEUE.value
+        )
     )
     value_class = _valid_choice(
         decision.get("value_class"),
         {value.value for value in ValueClass},
         _value_class(annual_est),
     )
+    if not has_hard_primary:
+        value_class = ValueClass.OBSERVATION.value
     recommended_solution = _valid_choice(
         decision.get("recommended_solution"),
         {value.value for value in RecommendedSolution},
@@ -882,25 +1017,33 @@ def _derive_from_decision(
         scene_type,
         selected_metric.field_value if selected_metric else "主指标量化证据不足",
         recommended_solution,
-        inference_used=not (selected_metric and selected_metric.field_key in ANNUAL_VISIT_FIELDS),
+        inference_used=not _is_direct_annual_visit_metric(annual_metric),
     )
     next_action = _clean_optional_text(decision.get("next_action")) or _fallback_next_action(
         target,
         has_hard_primary=has_hard_primary,
         source_domain_count=source_domain_count,
     )
-    inference_basis = _clean_optional_text(decision.get("inference_basis")) or (
-        selected_metric.field_value
+    inference_basis = (
+        annual_metric.field_value
+        if annual_metric and annual_est is not None
+        else selected_metric.field_value
         if selected_metric
-        else "No hard primary metric in evidence pool"
+        else (
+            _clean_optional_text(decision.get("inference_basis"))
+            or "No hard primary metric in evidence pool"
+        )
     )
     proxy_chain = proxy_annual.chain if proxy_annual is not None else None
-    if selected_metric and selected_metric.field_key not in ANNUAL_VISIT_FIELDS and proxy_chain:
+    if selected_metric and proxy_chain:
         inference_chain = proxy_chain
     else:
         inference_chain = _clean_optional_text(decision.get("inference_chain")) or (
             proxy_chain
-            or "GPT aggregates objective evidence -> applies scene proxy -> derives visits/capacity/action"
+            or (
+                "GPT aggregates objective evidence -> applies scene proxy -> "
+                "derives visits/capacity/action"
+            )
     )
     inference_confidence = _valid_choice(
         decision.get("inference_confidence"),
@@ -928,6 +1071,8 @@ def _derive_from_decision(
             if assumption_note
             else LOW_EVIDENCE_LABEL
         )
+        capacity_estimate = None
+        capacity_unit = None
     provider_type = _clean_optional_text(decision.get("provider_type")) or "unknown"
     return DerivedValues(
         property_id=target["property_id"],
@@ -1287,6 +1432,104 @@ def _demand_inference_chain(derived: DerivedValues, demand: Any) -> str:
 
 
 def _best_metric(scene_type: str, evidence_rows: list[dict[str, Any]]) -> EvidenceMetric | None:
+    candidates = _metric_candidates(scene_type, evidence_rows)
+    if not candidates:
+        return None
+    return sorted(candidates, key=lambda item: item.priority)[0]
+
+
+def _best_visit_metric(
+    scene_type: str,
+    evidence_rows: list[dict[str, Any]],
+) -> EvidenceMetric | None:
+    candidates = [
+        metric
+        for metric in _metric_candidates(scene_type, evidence_rows)
+        if metric.field_key in VISIT_METRIC_FIELDS
+        and metric.numeric_unit in {"visits/year", "visits/day"}
+    ]
+    candidates.extend(_embedded_visit_metric_candidates(scene_type, evidence_rows))
+    if not candidates:
+        return None
+
+    def priority(metric: EvidenceMetric) -> tuple[int, int, int, float]:
+        tier_rank = {"Tier 1": 0, "Tier 2": 1, "Tier 3": 2}.get(metric.source_tier, 3)
+        unit_rank = 0 if metric.numeric_unit == "visits/year" else 1
+        field_rank = 0 if metric.field_key in ANNUAL_VISIT_FIELDS else 1
+        return (unit_rank, field_rank, tier_rank, -float(metric.numeric_value or 0))
+
+    return sorted(candidates, key=priority)[0]
+
+
+def _embedded_visit_metric_candidates(
+    scene_type: str,
+    evidence_rows: list[dict[str, Any]],
+) -> list[EvidenceMetric]:
+    if scene_type not in VISITOR_PRIMARY_SCENES and scene_type not in {"hospital"}:
+        return []
+    candidates: list[EvidenceMetric] = []
+    accepted = QUANTITATIVE_PRIMARY.get(scene_type, [])
+    accepted_set = set(accepted)
+    for row in evidence_rows:
+        field_key = _field_key(row)
+        if field_key not in accepted_set:
+            continue
+        if field_key in VISIT_METRIC_FIELDS:
+            continue
+        text_value = str(row.get("field_value") or "")
+        lower = text_value.casefold()
+        if not _has_digit(lower) or not _has_visit_context(lower):
+            continue
+        annual_numbers = _period_matched_visit_numbers(lower, ANNUAL_PERIOD_MARKERS)
+        daily_value = _daily_visit_value(lower)
+        if annual_numbers:
+            numeric_value = max(annual_numbers)
+            numeric_unit = "visits/year"
+            derived_key = "annual_footfall"
+        elif daily_value is not None:
+            numeric_value = daily_value
+            numeric_unit = "visits/day"
+            derived_key = "daily_visitors"
+        else:
+            continue
+        tier_rank = {"Tier 1": 0, "Tier 2": 1, "Tier 3": 2}.get(
+            str(row.get("source_tier") or ""),
+            3,
+        )
+        candidates.append(
+            EvidenceMetric(
+                field_key=derived_key,
+                field_value=text_value.strip(),
+                source_name=str(row.get("source_name") or ""),
+                source_tier=str(row.get("source_tier") or ""),
+                source_url=str(row.get("source_url") or ""),
+                source_date=row.get("source_date"),
+                numeric_value=numeric_value,
+                numeric_unit=numeric_unit,
+                priority=(-1, tier_rank, -int(numeric_value)),
+            )
+        )
+    return candidates
+
+
+def _should_select_visit_metric_as_primary(
+    scene_type: str,
+    selected_metric: EvidenceMetric | None,
+    visit_metric: EvidenceMetric | None,
+) -> bool:
+    if visit_metric is None:
+        return False
+    if selected_metric is None:
+        return scene_type in VISITOR_PRIMARY_SCENES
+    if selected_metric.field_key in VISIT_METRIC_FIELDS:
+        return False
+    return scene_type in VISITOR_PRIMARY_SCENES
+
+
+def _metric_candidates(
+    scene_type: str,
+    evidence_rows: list[dict[str, Any]],
+) -> list[EvidenceMetric]:
     accepted = QUANTITATIVE_PRIMARY.get(scene_type, [])
     accepted_set = set(accepted)
     candidates: list[EvidenceMetric] = []
@@ -1318,9 +1561,7 @@ def _best_metric(scene_type: str, evidence_rows: list[dict[str, Any]]) -> Eviden
                 priority=(indicator_rank, tier_rank, -int(numeric_value)),
             )
         )
-    if not candidates:
-        return None
-    return sorted(candidates, key=lambda item: item.priority)[0]
+    return candidates
 
 
 def _decision_metric(decision: dict[str, Any]) -> EvidenceMetric | None:
@@ -1387,7 +1628,400 @@ def _qa_summary(targets: list[dict[str, Any]], evidence: dict[str, list[dict[str
             }
             for scene in sorted(totals)
         },
+        "data_integrity_gate": _data_integrity_gate(targets, evidence),
     }
+
+
+def _data_integrity_gate(
+    targets: list[dict[str, Any]],
+    evidence: dict[str, list[dict[str, Any]]],
+) -> dict[str, Any]:
+    year_like_samples: list[dict[str, Any]] = []
+    area_metric_year_like_samples: list[dict[str, Any]] = []
+    airport_role_samples: list[dict[str, Any]] = []
+    transport_line_annual_samples: list[dict[str, Any]] = []
+    line_count_not_selected_samples: list[dict[str, Any]] = []
+    wikidata_property_id_samples: list[dict[str, Any]] = []
+    daily_as_annual_samples: list[dict[str, Any]] = []
+    direct_visit_overridden_samples: list[dict[str, Any]] = []
+    hard_metric_not_materialized_samples: list[dict[str, Any]] = []
+    implausible_annual_samples: list[dict[str, Any]] = []
+    implausible_area_metric_samples: list[dict[str, Any]] = []
+    low_evidence_high_value_samples: list[dict[str, Any]] = []
+
+    counts = Counter()
+    for target in targets:
+        scene_type = target["scene_type"]
+        annual_visits_est = _float_or_none(target.get("annual_visits_est"))
+        area_metric_name = _normalize_key(str(target.get("area_metric_name") or ""))
+        area_metric_value = _float_or_none(target.get("area_metric_value"))
+        metric_availability = str(target.get("metric_availability_level") or "")
+        rows = evidence.get(target["property_id"], [])
+        metric = _best_metric(scene_type, rows)
+        visit_metric = _best_visit_metric(scene_type, rows)
+
+        if metric is not None and (
+            metric_availability != HARD_EVIDENCE_LABEL or area_metric_value is None
+        ):
+            counts["hard_primary_metric_not_materialized_count"] += 1
+            _append_gate_sample(
+                hard_metric_not_materialized_samples,
+                target,
+                "hard primary metric exists in evidence but active derived fields are not materialized",
+                annual_visits_est=annual_visits_est,
+                area_metric_name=target.get("area_metric_name"),
+                area_metric_value=area_metric_value,
+                evidence_value=metric.field_value,
+            )
+
+        if _is_year_like_annual_visit(annual_visits_est):
+            counts["year_like_annual_visits_count"] += 1
+            _append_gate_sample(
+                year_like_samples,
+                target,
+                "annual_visits_est looks like a reporting year",
+                annual_visits_est=annual_visits_est,
+                area_metric_name=target.get("area_metric_name"),
+                area_metric_value=area_metric_value,
+                evidence_value=metric.field_value if metric else None,
+            )
+
+        annual_reason = _implausible_annual_reason(scene_type, annual_visits_est)
+        if annual_reason:
+            counts["implausible_annual_visits_count"] += 1
+            _append_gate_sample(
+                implausible_annual_samples,
+                target,
+                annual_reason,
+                annual_visits_est=annual_visits_est,
+                area_metric_name=target.get("area_metric_name"),
+                area_metric_value=area_metric_value,
+                evidence_value=metric.field_value if metric else None,
+            )
+
+        area_reason = _implausible_area_metric_reason(
+            scene_type,
+            str(target.get("area_metric_name") or ""),
+            str(target.get("area_metric_unit") or ""),
+            area_metric_value,
+        )
+        if area_reason:
+            counts["implausible_area_metric_value_count"] += 1
+            _append_gate_sample(
+                implausible_area_metric_samples,
+                target,
+                area_reason,
+                annual_visits_est=annual_visits_est,
+                area_metric_name=target.get("area_metric_name"),
+                area_metric_value=area_metric_value,
+                evidence_value=metric.field_value if metric else None,
+            )
+
+        if metric_availability == LOW_EVIDENCE_LABEL and str(
+            target.get("value_class") or ""
+        ) in {ValueClass.NATIONAL_FLAGSHIP.value, ValueClass.CITY_CORE.value}:
+            counts["low_evidence_high_value_count"] += 1
+            _append_gate_sample(
+                low_evidence_high_value_samples,
+                target,
+                "low primary metric evidence must not carry high value_class",
+                annual_visits_est=annual_visits_est,
+                area_metric_name=target.get("area_metric_name"),
+                area_metric_value=area_metric_value,
+                evidence_value=metric.field_value if metric else None,
+            )
+
+        if (
+            _is_year_like_annual_visit(area_metric_value)
+            and _metric_value_looks_like_reporting_year(rows, area_metric_value)
+        ):
+            counts["year_like_area_metric_value_count"] += 1
+            _append_gate_sample(
+                area_metric_year_like_samples,
+                target,
+                "area_metric_value appears to have been parsed from a reporting year",
+                annual_visits_est=annual_visits_est,
+                area_metric_name=target.get("area_metric_name"),
+                area_metric_value=area_metric_value,
+                evidence_value=metric.field_value if metric else None,
+            )
+
+        if (
+            metric is not None
+            and metric.numeric_unit == "visits/day"
+            and annual_visits_est is not None
+            and metric.numeric_value is not None
+            and annual_visits_est <= metric.numeric_value * 31
+        ):
+            counts["daily_metric_materialized_as_annual_count"] += 1
+            _append_gate_sample(
+                daily_as_annual_samples,
+                target,
+                "daily/business-day metric appears to have been stored as annual_visits_est",
+                annual_visits_est=annual_visits_est,
+                area_metric_name=target.get("area_metric_name"),
+                area_metric_value=area_metric_value,
+                evidence_value=metric.field_value,
+            )
+
+        visit_proxy = _annual_visits_from_metric(scene_type, visit_metric)
+        if (
+            visit_metric is not None
+            and visit_proxy is not None
+            and metric is not None
+            and metric.field_key not in VISIT_METRIC_FIELDS
+            and annual_visits_est is not None
+            and abs(annual_visits_est - visit_proxy.value) > max(
+                1.0,
+                visit_proxy.value * 0.02,
+            )
+        ):
+            counts["direct_visit_metric_overridden_count"] += 1
+            _append_gate_sample(
+                direct_visit_overridden_samples,
+                target,
+                "direct daily/year visit evidence was overridden by a capacity/area proxy",
+                annual_visits_est=annual_visits_est,
+                area_metric_name=target.get("area_metric_name"),
+                area_metric_value=area_metric_value,
+                evidence_value=visit_metric.field_value,
+            )
+
+        if scene_type == "airport_terminal" and area_metric_name in {
+            "gateway_role",
+            "hub_role",
+            "strategic_role",
+            "terminal_role",
+            "airport_role",
+        }:
+            counts["airport_role_primary_metric_count"] += 1
+            _append_gate_sample(
+                airport_role_samples,
+                target,
+                "airport role evidence was selected as the primary metric",
+                annual_visits_est=annual_visits_est,
+                area_metric_name=target.get("area_metric_name"),
+                area_metric_value=area_metric_value,
+                evidence_value=metric.field_value if metric else None,
+            )
+
+        if (
+            scene_type == "transport_hub"
+            and area_metric_name == "line_count"
+            and annual_visits_est is not None
+        ):
+            counts["transport_line_count_with_annual_visits_count"] += 1
+            _append_gate_sample(
+                transport_line_annual_samples,
+                target,
+                "transport line_count produced annual_visits_est",
+                annual_visits_est=annual_visits_est,
+                area_metric_name=target.get("area_metric_name"),
+                area_metric_value=area_metric_value,
+                evidence_value=metric.field_value if metric else None,
+            )
+
+        if (
+            scene_type == "transport_hub"
+            and metric is not None
+            and metric.field_key == "line_count"
+            and area_metric_name != "line_count"
+        ):
+            counts["transport_line_count_evidence_not_selected_count"] += 1
+            _append_gate_sample(
+                line_count_not_selected_samples,
+                target,
+                "valid line_count evidence was not selected as the scene primary metric",
+                annual_visits_est=annual_visits_est,
+                area_metric_name=target.get("area_metric_name"),
+                area_metric_value=area_metric_value,
+                evidence_value=metric.field_value,
+            )
+
+        if _has_wikidata_property_id_pollution(
+            rows,
+            area_metric_value=area_metric_value,
+            annual_visits_est=annual_visits_est,
+        ):
+            counts["wikidata_property_id_metric_pollution_count"] += 1
+            _append_gate_sample(
+                wikidata_property_id_samples,
+                target,
+                "Wikidata property id appears to have been parsed as a metric value",
+                annual_visits_est=annual_visits_est,
+                area_metric_name=target.get("area_metric_name"),
+                area_metric_value=area_metric_value,
+                evidence_value=metric.field_value if metric else None,
+            )
+
+    blocking_issue_count = sum(counts.values())
+    return {
+        "passed": blocking_issue_count == 0,
+        "blocking_issue_count": blocking_issue_count,
+        "counts": dict(counts),
+        "samples": {
+            "year_like_annual_visits": year_like_samples,
+            "year_like_area_metric_value": area_metric_year_like_samples,
+            "airport_role_primary_metric": airport_role_samples,
+            "transport_line_count_with_annual_visits": transport_line_annual_samples,
+            "transport_line_count_evidence_not_selected": line_count_not_selected_samples,
+            "wikidata_property_id_metric_pollution": wikidata_property_id_samples,
+            "daily_metric_materialized_as_annual": daily_as_annual_samples,
+            "direct_visit_metric_overridden": direct_visit_overridden_samples,
+            "hard_primary_metric_not_materialized": hard_metric_not_materialized_samples,
+            "implausible_annual_visits": implausible_annual_samples,
+            "implausible_area_metric_value": implausible_area_metric_samples,
+            "low_evidence_high_value": low_evidence_high_value_samples,
+        },
+    }
+
+
+def _append_gate_sample(
+    samples: list[dict[str, Any]],
+    target: dict[str, Any],
+    issue: str,
+    *,
+    annual_visits_est: float | None,
+    area_metric_name: Any,
+    area_metric_value: float | None,
+    evidence_value: str | None,
+) -> None:
+    if len(samples) >= 10:
+        return
+    samples.append(
+        {
+            "property_id": target["property_id"],
+            "scan_run_id": target["scan_run_id"],
+            "country": target["country"],
+            "city": target["city"],
+            "property_name": target["canonical_name"],
+            "scene_type": target["scene_type"],
+            "issue": issue,
+            "annual_visits_est": annual_visits_est,
+            "area_metric_name": area_metric_name,
+            "area_metric_value": area_metric_value,
+            "evidence_value": evidence_value,
+        }
+    )
+
+
+def _is_year_like_annual_visit(value: float | None) -> bool:
+    return is_year_like_annual_visit(value)
+
+
+def _safe_annual_visit_estimate(value: float | None) -> float | None:
+    return safe_annual_visit_estimate(value)
+
+
+def _metric_value_looks_like_reporting_year(
+    evidence_rows: list[dict[str, Any]],
+    value: float | None,
+) -> bool:
+    numeric_value = _float_or_none(value)
+    if numeric_value is None or not numeric_value.is_integer():
+        return False
+    year = str(int(numeric_value))
+    year_token = re.compile(rf"(?<![\d,.]){re.escape(year)}[.,]?(?![\d,.])")
+    year_context = re.compile(
+        rf"(?:as\s+of|in|by|since|commissioned(?:\s+on)?|opened(?:\s+on)?|opening|from)\s+"
+        rf"(?:[A-Za-z]+\s+\d{{1,2}},?\s+)?{re.escape(year)}[.,]?"
+        rf"|{re.escape(year)}[.,]?\s+(?:report|statistics|traffic|fiscal|calendar|data|source)",
+        re.IGNORECASE,
+    )
+    for row in evidence_rows:
+        text_value = str(row.get("field_value") or "")
+        if year_token.search(text_value) and year_context.search(text_value):
+            return True
+    return False
+
+
+def _has_wikidata_property_id_pollution(
+    evidence_rows: list[dict[str, Any]],
+    *,
+    area_metric_value: float | None,
+    annual_visits_est: float | None,
+) -> bool:
+    property_ids = {
+        "p81": 81,
+        "p3872": 3872,
+    }
+    values = {
+        int(value)
+        for value in [area_metric_value, annual_visits_est]
+        if value is not None and float(value).is_integer()
+    }
+    if not values:
+        return False
+    for row in evidence_rows:
+        text_value = str(row.get("field_value") or "").casefold()
+        for property_id, numeric_value in property_ids.items():
+            if property_id in text_value and numeric_value in values:
+                return True
+    return False
+
+
+def _implausible_annual_reason(
+    scene_type: str,
+    annual_visits_est: float | None,
+) -> str | None:
+    value = _float_or_none(annual_visits_est)
+    if value is None:
+        return None
+    caps = {
+        "airport_terminal": 300_000_000,
+        "convention_center": 100_000_000,
+        "stadium": 50_000_000,
+        "luxury_hotel_mice": 250_000_000,
+        "mall_mixed_use": 2_000_000_000,
+        "office_government": 1_000_000_000,
+        "hospital": 500_000_000,
+        "university": 500_000_000,
+        "transport_hub": 5_000_000_000,
+        "cruise_port": 100_000_000,
+        "mosque": 500_000_000,
+    }
+    cap = caps.get(scene_type, 1_000_000_000)
+    if value > cap:
+        return f"annual_visits_est exceeds plausible {scene_type} cap {cap:g}"
+    return None
+
+
+def _implausible_area_metric_reason(
+    scene_type: str,
+    area_metric_name: str,
+    area_metric_unit: str,
+    area_metric_value: float | None,
+) -> str | None:
+    value = _float_or_none(area_metric_value)
+    if value is None:
+        return None
+    name = _normalize_key(area_metric_name)
+    unit = _normalize_key(area_metric_unit)
+    if scene_type == "stadium" and name == "seat_count" and value > 250_000:
+        return "stadium seat_count exceeds plausible venue capacity"
+    if scene_type == "airport_terminal" and name == "annual_passenger_throughput" and value > 300_000_000:
+        return "airport passenger throughput exceeds plausible airport cap"
+    if scene_type == "transport_hub" and name == "daily_ridership" and value > 20_000_000:
+        return "transport daily ridership exceeds plausible daily cap"
+    if scene_type == "transport_hub" and name == "line_count" and value > 20:
+        return "transport line_count exceeds plausible interchange line count"
+    if scene_type == "luxury_hotel_mice" and name == "keys" and value > 5_000:
+        return "hotel keys exceeds plausible property room count"
+    if scene_type == "hospital" and name == "beds" and value > 10_000:
+        return "hospital beds exceeds plausible single-facility bed count"
+    if scene_type == "convention_center" and name in {"exhibition_area", "meeting_area"} and value > 1_000_000:
+        return "convention area exceeds plausible venue area"
+    if scene_type == "mall_mixed_use" and name == "gla" and value > 1_500_000:
+        return "mall GLA exceeds plausible property area"
+    if scene_type == "office_government" and name in {"nla", "office_gfa", "office_nla"}:
+        if unit and unit not in {"sqm", "m2", "sq_m", "square_meters", "square_metres"}:
+            return "office area metric uses non-area unit"
+        if value > 5_000_000:
+            return "office area exceeds plausible building area"
+    if name in {"gla", "nla", "exhibition_area", "meeting_area", "mosque_area"} and unit:
+        if unit in {"people", "persons", "persons_day", "visits_year", "daily_visits"}:
+            return "area metric uses people/visit unit"
+    return None
 
 
 def _low_evidence_samples(derived_rows: list[DerivedValues]) -> list[dict[str, Any]]:
@@ -1531,19 +2165,31 @@ def _annual_visits_from_metric(
         return None
     value = metric.numeric_value
     field_key = metric.field_key
-    if field_key in ANNUAL_VISIT_FIELDS:
+    if metric.numeric_unit == "visits/day":
+        return _annual_proxy(value, 365, metric, "daily/business-day metric x 365 days")
+    if _is_direct_annual_visit_metric(metric):
         return AnnualVisitProxy(
             value=value,
             basis=f"direct annual visit metric: {field_key}",
-            chain=f"{field_key} direct evidence ({metric.field_value}) -> annual_visits_est={int(value)}",
+            chain=(
+                f"{field_key} direct evidence ({metric.field_value}) -> "
+                f"annual_visits_est={int(value)}"
+            ),
         )
     if field_key in DAILY_VISIT_FIELDS:
         return _annual_proxy(value, 365, metric, "daily ridership x 365 days")
+    if scene_type == "airport_terminal" and field_key == "terminal_capacity":
+        return None
     if scene_type == "stadium" and field_key in PEOPLE_CAPACITY_FIELDS:
         return _annual_proxy(value, 15, metric, "seats/capacity x 15 annual event-equivalents")
     if scene_type == "convention_center":
         if field_key in AREA_FIELDS:
-            return _annual_proxy(value, 10, metric, "exhibition/meeting sqm x 10 visitor-equivalents")
+            return _annual_proxy(
+                value,
+                10,
+                metric,
+                "exhibition/meeting sqm x 10 visitor-equivalents",
+            )
         if field_key in PEOPLE_CAPACITY_FIELDS:
             return _annual_proxy(value, 10, metric, "capacity x 10 annual event-equivalents")
     if scene_type == "luxury_hotel_mice":
@@ -1561,7 +2207,7 @@ def _annual_visits_from_metric(
         return _annual_proxy(value, 1_000, metric, "hospital scale metric x 1000 annual visits")
     if scene_type == "university":
         return _annual_proxy(value, 180, metric, "campus population/enrollment x 180 active days")
-    if scene_type == "transport_hub":
+    if scene_type == "transport_hub" and field_key != "line_count":
         return _annual_proxy(value, 365, metric, "transport daily metric x 365 days")
     if scene_type == "cruise_port":
         return AnnualVisitProxy(
@@ -1569,10 +2215,16 @@ def _annual_visits_from_metric(
             basis=f"direct cruise passenger metric: {field_key}",
             chain=f"{field_key} evidence ({metric.field_value}) -> annual_visits_est={int(value)}",
         )
-    return AnnualVisitProxy(
-        value=value,
-        basis=f"primary metric passthrough: {field_key}",
-        chain=f"{field_key} evidence ({metric.field_value}) -> annual_visits_est={int(value)}",
+    if scene_type == "mosque" and field_key in AREA_FIELDS:
+        return _annual_proxy(value, 35, metric, "mosque sqm x 35 annual visitor-equivalents")
+    return None
+
+
+def _is_direct_annual_visit_metric(metric: EvidenceMetric | None) -> bool:
+    return (
+        metric is not None
+        and metric.field_key in VISIT_METRIC_FIELDS
+        and metric.numeric_unit == "visits/year"
     )
 
 
@@ -1595,16 +2247,56 @@ def _annual_proxy(
 
 def _numeric_value_and_unit(field_key: str, value: str) -> tuple[float | None, str | None]:
     lower = value.casefold()
+    if field_key == "line_count":
+        line_count = _line_count_value(lower)
+        return (line_count, "lines") if line_count is not None else (None, None)
+    if field_key == "seat_count":
+        seats = _seat_count_value(lower)
+        return (seats, "seats") if seats is not None else (None, None)
+    if field_key == "beds":
+        beds = _bed_count_value(lower)
+        return (beds, "beds") if beds is not None else (None, None)
+    if field_key in FLOOR_COUNT_FIELDS:
+        floors = _floor_count_value(lower)
+        return (floors, "floors") if floors is not None else (None, None)
+    if field_key in HEIGHT_FIELDS:
+        height = _height_value(lower)
+        return (height, "meters") if height is not None else (None, None)
+    if field_key in ROOM_FIELDS:
+        rooms = _room_count_value(lower)
+        return (rooms, "rooms") if rooms is not None else (None, None)
+    if field_key in STAFF_COUNT_FIELDS:
+        staff = _staff_count_value(lower)
+        return (staff, "people") if staff is not None else (None, None)
     if field_key in AREA_FIELDS:
-        area = _area_value(lower)
+        area = _area_value(lower, field_key=field_key)
         if area is not None:
             return area, "sqm"
+        return None, None
     if field_key in DAILY_VISIT_FIELDS:
-        daily_numbers = _period_matched_numbers(lower, DAILY_PERIOD_MARKERS)
-        if daily_numbers:
-            return max(daily_numbers), _unit_for_field(field_key, lower)
-        if any(marker in lower for marker in ANNUAL_PERIOD_MARKERS):
-            return None, None
+        daily_value = _daily_visit_value(lower)
+        if daily_value is not None:
+            return daily_value, "visits/day"
+        return None, None
+    if field_key in VISIT_VOLUME_FIELDS:
+        annual_numbers = _period_matched_numbers(lower, ANNUAL_PERIOD_MARKERS)
+        if annual_numbers:
+            return max(annual_numbers), "visits/year"
+        daily_value = _daily_visit_value(lower)
+        if daily_value is not None:
+            return daily_value, "visits/day"
+        return None, None
+    if field_key in ANNUAL_VISIT_FIELDS:
+        annual_numbers = _period_matched_numbers(lower, ANNUAL_PERIOD_MARKERS)
+        if annual_numbers:
+            return max(annual_numbers), "visits/year"
+        daily_value = _daily_visit_value(lower)
+        if daily_value is not None:
+            return daily_value, "visits/day"
+        numbers = _annual_visit_fallback_numbers(lower)
+        if numbers and _is_safe_annual_visit_fallback(lower):
+            return max(numbers), "visits/year"
+        return None, None
     numbers = _numbers_with_multipliers(lower)
     if not numbers:
         return None, None
@@ -1612,7 +2304,190 @@ def _numeric_value_and_unit(field_key: str, value: str) -> tuple[float | None, s
     return number, _unit_for_field(field_key, lower)
 
 
-def _area_value(lower: str) -> float | None:
+def _line_count_value(lower: str) -> float | None:
+    patterns = [
+        r"\bline\s*count\s*[:=]\s*(\d{1,3})\b",
+        r"\b(\d{1,3})\s*(?:rail/metro\s*)?(?:metro\s*)?(?:rail\s*)?"
+        r"(?:lines|routes)\b",
+        r"\b(?:serves|served\s+by|connected\s+to|interchange\s+with)\s+"
+        r"(\d{1,3})\s*(?:metro\s*)?(?:rail\s*)?(?:lines|routes)\b",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, lower)
+        if not match:
+            continue
+        raw = match.group(1)
+        value = _parse_number(raw)
+        if value is not None and 1 <= value <= 20:
+            return value
+    return None
+
+
+def _floor_count_value(lower: str) -> float | None:
+    patterns = [
+        r"\b(?:floor\s*count|floors?|storeys?|stories)\s*(?:of|:|=)?\s*(\d{1,3})\b",
+        r"\b(\d{1,3})\s*(?:floors?|storeys?|stories)\b",
+    ]
+    for pattern in patterns:
+        for match in re.finditer(pattern, lower):
+            value = _parse_number(match.group(1))
+            if value is not None and 1 <= value <= 200:
+                return value
+    return None
+
+
+def _height_value(lower: str) -> float | None:
+    patterns = [
+        r"\b(?:height|tower\s*height)\s*(?:of|:|=)?\s*(\d[\d,.\s]*\d|\d)\s*(?:m|metres?|meters?)\b",
+        r"\b(\d[\d,.\s]*\d|\d)\s*(?:m|metres?|meters?)\s*(?:high|tall|height)\b",
+        r"\b(\d[\d,.\s]*\d|\d)\s*-\s*(?:metre|meter|m)\s*(?:high|tall)?\b",
+    ]
+    for pattern in patterns:
+        for match in re.finditer(pattern, lower):
+            value = _parse_number(match.group(1))
+            if value is not None and 10 <= value <= 1_000:
+                return value
+    return None
+
+
+def _seat_count_value(lower: str) -> float | None:
+    values: list[float] = []
+    patterns = [
+        r"(\d[\d,.\s]*\d|\d)\s*[- ]?(?:seat|seats|seater|spectators|places)\b",
+        r"\b(?:capacity|seat\s*count|seating\s*capacity)\s*(?:of|:|=)?\s*"
+        r"(\d[\d,.\s]*\d|\d)\b",
+    ]
+    for pattern in patterns:
+        for match in re.finditer(pattern, lower):
+            if _is_money_number_context(lower, match.start(), match.end()):
+                continue
+            local = lower[max(0, match.start() - 24) : min(len(lower), match.end() + 32)]
+            if re.search(r"\b(?:sqm|sq\.?\s*m|m2|m²|square\s*met|acre|hectare)\b", local):
+                continue
+            value = _parse_number(match.group(1))
+            if value is not None and not _looks_like_year(match.group(1), value):
+                values.append(value)
+    return max(values) if values else None
+
+
+def _bed_count_value(lower: str) -> float | None:
+    per_site_patterns = [
+        r"(\d[\d,.\s]*\d|\d)\s*(?:inpatient\s*)?beds?\s+per\s+"
+        r"(?:facility|hospital|site|regional\s+hospital)",
+        r"each\s+(?:modern\s+)?(?:regional\s+)?(?:facility|hospital|site)"
+        r".{0,80}?(\d[\d,.\s]*\d|\d)\s*(?:inpatient\s*)?beds?",
+    ]
+    for pattern in per_site_patterns:
+        values = [
+            value
+            for value in (_parse_number(match.group(1)) for match in re.finditer(pattern, lower))
+            if value is not None
+        ]
+        if values:
+            return max(values)
+    bed_matches = [
+        _parse_number(match.group(1))
+        for match in re.finditer(
+            r"(\d[\d,.\s]*\d|\d)(?:\s*[-–]\s*|\s*\+?\s*)"
+            r"(?:inpatient\s*)?beds?\b",
+            lower,
+        )
+        if not _looks_like_year(match.group(1), _parse_number(match.group(1)) or 0)
+    ]
+    bed_matches.extend(
+        _parse_number(match.group(1))
+        for match in re.finditer(
+            r"\bbeds?\s*[:=]\s*(\d[\d,.\s]*\d|\d)\b",
+            lower,
+        )
+        if not _looks_like_year(match.group(1), _parse_number(match.group(1)) or 0)
+    )
+    bed_values = [value for value in bed_matches if value is not None]
+    if bed_values:
+        return max(bed_values)
+    return None
+
+
+def _room_count_value(lower: str) -> float | None:
+    values: list[float] = []
+    label_first_patterns = [
+        r"(?:guest\s+rooms?|hotel\s+rooms?|rooms?\s+and\s+suites|rooms?|keys)"
+        r"\s*[:=]\s*(\d[\d,.\s]*\d|\d)",
+        r"(?:lists|offers|features|has|with)\s+(\d[\d,.\s]*\d|\d)\s+"
+        r"(?:guest\s+rooms?|hotel\s+rooms?|rooms?\s+and\s+suites|keys)\b",
+    ]
+    number_first_patterns = [
+        r"(\d[\d,.\s]*\d|\d)\s+(?:guest\s+rooms?|hotel\s+rooms?|rooms?\s+and\s+suites|keys)\b",
+        r"(\d[\d,.\s]*\d|\d)\s+rooms?\b",
+    ]
+    for pattern in [*label_first_patterns, *number_first_patterns]:
+        for match in re.finditer(pattern, lower):
+            if _is_room_count_exclusion_context(
+                lower,
+                match.start(),
+                match.end(),
+                match_text=match.group(0),
+            ):
+                continue
+            value = _parse_number(match.group(1))
+            if value is None or _looks_like_year(match.group(1), value):
+                continue
+            if 1 <= value <= 5_000:
+                values.append(value)
+    if values:
+        return max(values)
+    return None
+
+
+def _staff_count_value(lower: str) -> float | None:
+    values: list[float] = []
+    patterns = [
+        r"\b(?:staff|employees?|workforce)\s*(?:count|total)?\s*[:=]\s*"
+        r"(\d[\d,.\s]*\d|\d)\b",
+        r"\b(\d[\d,.\s]*\d|\d)\s+(?:staff|employees?|workers?)\b",
+    ]
+    for pattern in patterns:
+        for match in re.finditer(pattern, lower):
+            value = _parse_number(match.group(1))
+            if (
+                value is not None
+                and not _looks_like_year(match.group(1), value)
+                and 1 <= value <= 100_000
+            ):
+                values.append(value)
+    return max(values) if values else None
+
+
+def _is_room_count_exclusion_context(
+    lower: str,
+    start: int,
+    end: int,
+    *,
+    match_text: str,
+) -> bool:
+    if re.search(r"\b(?:guest\s+rooms?|hotel\s+rooms?|rooms?\s+and\s+suites|keys)\b", match_text):
+        return False
+    local = lower[max(0, start - 28) : min(len(lower), end + 32)]
+    return bool(
+        re.search(
+            r"\b(?:meeting|conference|function|ballroom|event|largest|total)\s+rooms?\b"
+            r"|\b(?:sq\.?\s*ft|square\s*feet|sqm|m2|m²|square\s*met)",
+            local,
+        )
+    )
+
+
+def _area_value(lower: str, *, field_key: str | None = None) -> float | None:
+    if field_key in {"exhibition_area", "meeting_area"} and re.search(
+        r"\b(?:complex|site|campus|plot|land)\s+area\b",
+        lower,
+    ):
+        if not re.search(
+            r"\b(?:exhibition|meeting|event|conference|hall|function|ballroom)\s+"
+            r"(?:area|space|sqm|sq\.?\s*m|m2|m²)",
+            lower,
+        ):
+            return None
     metric_matches = [
         _parse_number(match.group(1))
         for match in re.finditer(
@@ -1638,6 +2513,10 @@ DAILY_PERIOD_MARKERS = (
     "per day",
     "a day",
     "daily",
+    "business day",
+    "business-day",
+    "weekday",
+    "weekdays",
     "passengers/day",
     "passenger/day",
     "riders/day",
@@ -1657,6 +2536,83 @@ ANNUAL_PERIOD_MARKERS = (
 )
 
 
+def _daily_visit_value(lower: str) -> float | None:
+    values: list[float] = []
+    preferred_patterns = [
+        r"(?:average|avg\.?|typical|normal)\s+(?:daily|business[-\s]+day|weekday)"
+        r"(?:\s+(?:visitation|visits|visitors|passengers|ridership|traffic))?"
+        r"\s*(?::|=|of)?\s*(\d[\d,.\s]*\d|\d)",
+        r"(?:daily|business[-\s]+day|weekday)"
+        r"\s+(?:visitation|visits|visitors|passengers|ridership|traffic)"
+        r"\s*(?::|=|of)?\s*(\d[\d,.\s]*\d|\d)",
+    ]
+    for pattern in preferred_patterns:
+        for match in re.finditer(pattern, lower):
+            value = _parse_number(match.group(1))
+            if value is not None and not _looks_like_year(match.group(1), value):
+                values.append(value)
+    if values:
+        return max(values)
+
+    number_first_patterns = [
+        r"(\d[\d,.\s]*\d|\d)\s*(?:people|passengers|visitors|visits|riders|users)?"
+        r"\s*(?:/|per)\s*(?:business[-\s]+)?day\b",
+        r"(\d[\d,.\s]*\d|\d)\s*(?:people|passengers|visitors|visits|riders|users)?"
+        r"\s+(?:on|per)\s+(?:business[-\s]+day|weekday|weekdays)\b",
+    ]
+    for pattern in number_first_patterns:
+        for match in re.finditer(pattern, lower):
+            if _is_peak_daily_context(lower, match.start(), match.end()):
+                continue
+            value = _parse_number(match.group(1))
+            if value is not None and not _looks_like_year(match.group(1), value):
+                values.append(value)
+    if values:
+        return max(values)
+
+    fallback_values: list[float] = []
+    for number, raw, _context, start, end in _numbers_with_context(
+        lower,
+        include_offsets=True,
+    ):
+        if _looks_like_year(raw, number):
+            continue
+        if _is_peak_daily_context(lower, start, end):
+            continue
+        if _is_annual_number_context(lower, start, end):
+            continue
+        local = lower[max(0, start - 32) : min(len(lower), end + 32)]
+        if re.search(
+            r"\b(?:beds?|rooms?|keys|sqm|sq\.?\s*m|m2|m²|square\s*met|"
+            r"staff|doctors?|employees?)\b",
+            local,
+        ):
+            continue
+        if any(marker in local for marker in DAILY_PERIOD_MARKERS) and _has_visit_context(local):
+            fallback_values.append(number)
+    return max(fallback_values) if fallback_values else None
+
+
+def _is_peak_daily_context(lower: str, start: int, end: int) -> bool:
+    local = lower[max(0, start - 36) : min(len(lower), end + 48)]
+    return bool(
+        re.search(
+            r"\b(?:special\s+dates?|peak|peaks?|maximum|max\.?|record|holiday|holidays)\b",
+            local,
+        )
+    )
+
+
+def _is_annual_number_context(lower: str, start: int, end: int) -> bool:
+    local = lower[max(0, start - 32) : min(len(lower), end + 32)]
+    return bool(
+        re.search(
+            r"\b(?:annual|annually|yearly|per\s+year|passengers/year|visits/year)\b",
+            local,
+        )
+    )
+
+
 def _period_matched_numbers(lower: str, markers: tuple[str, ...]) -> list[float]:
     values: list[float] = []
     for number, raw, context in _numbers_with_context(lower):
@@ -1667,24 +2623,136 @@ def _period_matched_numbers(lower: str, markers: tuple[str, ...]) -> list[float]
     return values
 
 
+def _period_matched_visit_numbers(lower: str, markers: tuple[str, ...]) -> list[float]:
+    values: list[float] = []
+    for number, raw, context in _numbers_with_context(lower):
+        if _looks_like_year(raw, number):
+            continue
+        if any(marker in context for marker in markers) and _has_visit_context(context):
+            values.append(number)
+    return values
+
+
+def _has_visit_context(lower: str) -> bool:
+    return bool(
+        re.search(
+            r"\b(?:passengers?|visitors?|visits?|footfall|attendance|attendees?|"
+            r"ridership|riders?|users?|people|consultations?|outpatients?|"
+            r"patients?|boardings?|traffic)\b",
+            lower,
+        )
+    )
+
+
 def _numbers_with_multipliers(lower: str) -> list[float]:
-    return [number for number, _, _ in _numbers_with_context(lower)]
+    return [
+        number
+        for number, raw, _ in _numbers_with_context(lower)
+        if not _looks_like_year(raw, number)
+    ]
 
 
-def _numbers_with_context(lower: str) -> list[tuple[float, str, str]]:
+def _annual_visit_fallback_numbers(lower: str) -> list[float]:
+    values: list[float] = []
+    for number, raw, _context, start, end in _numbers_with_context(
+        lower,
+        include_offsets=True,
+    ):
+        if _looks_like_year(raw, number):
+            continue
+        local = lower[max(0, start - 40) : min(len(lower), end + 40)]
+        if not _has_visit_context(local):
+            continue
+        if re.search(
+            r"\b(?:runways?|length|height|wide|long|floors?|storeys?|stories)\b"
+            r"|\s+m(?:[\s.,;:)]|$)|\b(?:meters?|metres?|kilometers?|kilometres?)\b",
+            local,
+        ):
+            continue
+        values.append(number)
+    return values
+
+
+def _numbers_with_context(
+    lower: str,
+    *,
+    include_offsets: bool = False,
+) -> list[Any]:
     values = []
-    for match in re.finditer(r"\d[\d,.]*", lower):
-        number = _parse_number(match.group(0))
-        if number is None:
+    for match in re.finditer(r"\d[\d,.]*(?:e[+-]?\d+)?", lower):
+        if match.start() > 0 and lower[match.start() - 1].isalpha():
             continue
         suffix = lower[match.end() : match.end() + 24]
+        context = _number_clause_context(lower, match.start(), match.end())
+        compact_million = _has_compact_million_suffix(suffix, context)
+        if _is_money_number_context(lower, match.start(), match.end()):
+            continue
+        number = _parse_number(
+            match.group(0),
+            scaled_suffix=(
+                "billion" in suffix or "million" in suffix or compact_million
+            ),
+        )
+        if number is None:
+            continue
         if "billion" in suffix:
             number *= 1_000_000_000
-        elif "million" in suffix:
+        elif "million" in suffix or compact_million:
             number *= 1_000_000
-        context = _number_clause_context(lower, match.start(), match.end())
-        values.append((number, match.group(0), context))
+        if include_offsets:
+            values.append((number, match.group(0), context, match.start(), match.end()))
+        else:
+            values.append((number, match.group(0), context))
     return values
+
+
+def _is_safe_annual_visit_fallback(lower: str) -> bool:
+    if not _has_visit_context(lower):
+        return False
+    return not bool(
+        re.search(
+            r"\b(?:destinations?|airlines?|routes?|traffic\s+share|market\s+share)\b"
+            r"|%",
+            lower,
+        )
+    )
+
+
+def _has_compact_million_suffix(suffix: str, context: str) -> bool:
+    if not re.match(r"\s*m(?:\b|/yr\b|/year\b|/annum\b|/pa\b|/p\.a\.)", suffix):
+        return False
+    if re.match(r"\s*m(?:2|²|eters?\b|etres?\b)", suffix):
+        return False
+    if re.match(r"\s+m\b", suffix) and not re.match(
+        r"\s+m\s*(?:/yr\b|/year\b|/annum\b|/pa\b|/p\.a\.\b|"
+        r"passengers?\b|visitors?\b|visits?\b|people\b|users?\b|riders?\b)",
+        suffix,
+    ):
+        return False
+    return bool(
+        re.search(r"\bm\s*(?:/yr|/year|/annum|/pa|/p\.a\.)\b", suffix)
+        or _has_visit_context(context)
+    )
+
+
+def _is_money_number_context(lower: str, start: int, end: int) -> bool:
+    left = max(lower.rfind(delimiter, 0, start) for delimiter in (";", "\n", "."))
+    right_candidates = [
+        position
+        for position in (lower.find(delimiter, end) for delimiter in (";", "\n", "."))
+        if position != -1
+    ]
+    right = min(right_candidates) if right_candidates else len(lower)
+    local = lower[max(0, left + 1) : right]
+    if re.search(r"(?:us\$|\$|€|£|\busd\b|\beur\b|\bgbp\b)", local):
+        return True
+    return bool(
+        "million" in local
+        and re.search(
+            r"\b(?:renovation|agreement|contract|investment|cost|funding|financing)\b",
+            local,
+        )
+    )
 
 
 def _number_clause_context(lower: str, start: int, end: int) -> str:
@@ -1699,7 +2767,8 @@ def _number_clause_context(lower: str, start: int, end: int) -> str:
 
 
 def _looks_like_year(raw: str, number: float) -> bool:
-    return raw.isdigit() and len(raw) == 4 and 1900 <= number <= 2100
+    stripped = raw.strip(".,")
+    return stripped.isdigit() and len(stripped) == 4 and 1900 <= number <= 2100
 
 
 def _field_key(row: dict[str, Any]) -> str:
@@ -1711,8 +2780,14 @@ def _field_key(row: dict[str, Any]) -> str:
 
 
 def _unit_for_field(field_key: str, lower: str) -> str | None:
+    if field_key == "beds":
+        return "beds"
     if field_key in PEOPLE_CAPACITY_FIELDS:
         return "people" if field_key != "seat_count" else "seats"
+    if field_key in FLOOR_COUNT_FIELDS:
+        return "floors"
+    if field_key in HEIGHT_FIELDS:
+        return "meters"
     if field_key in ROOM_FIELDS:
         return "rooms"
     if field_key in ANNUAL_VISIT_FIELDS:
@@ -1724,9 +2799,23 @@ def _unit_for_field(field_key: str, lower: str) -> str | None:
     return None
 
 
-def _parse_number(value: str) -> float | None:
+def _parse_number(value: str, *, scaled_suffix: bool = False) -> float | None:
+    normalized = value.replace(" ", "")
+    if (
+        scaled_suffix
+        and "," not in normalized
+        and re.fullmatch(r"\d{1,3}\.\d{1,3}", normalized)
+    ):
+        try:
+            return float(normalized)
+        except ValueError:
+            return None
+    if re.fullmatch(r"\d{1,3}(?:\.\d{3})+", normalized):
+        normalized = normalized.replace(".", "")
+    if re.fullmatch(r"\d{1,3}(?:,\d{3})+(?:\.\d+)?", normalized):
+        normalized = normalized.replace(",", "")
     try:
-        return float(value.replace(",", "").replace(" ", ""))
+        return float(normalized.replace(",", ""))
     except ValueError:
         return None
 
@@ -1783,8 +2872,41 @@ def _evidence_package_hash(
     payload = {
         "property": {
             "property_id": target["property_id"],
+            "scene_type": target["scene_type"],
+        },
+        "evidence_items": sorted(
+            [
+                {
+                    "field_group": row.get("field_group"),
+                    "indicator_name": row.get("indicator_name"),
+                    "field_value": row.get("field_value"),
+                    "unit": row.get("unit"),
+                    "evidence_type": row.get("evidence_type"),
+                    "source_name": row.get("source_name"),
+                    "source_tier": row.get("source_tier"),
+                    "source_url": row.get("source_url"),
+                    "source_date": row.get("source_date"),
+                }
+                for row in evidence_rows
+            ],
+            key=lambda item: json.dumps(item, ensure_ascii=False, sort_keys=True),
+        ),
+    }
+    text_payload = json.dumps(payload, ensure_ascii=False, sort_keys=True)
+    return hashlib.sha256(text_payload.encode("utf-8")).hexdigest()
+
+
+def _legacy_evidence_package_hash(
+    target: dict[str, Any],
+    evidence_rows: list[dict[str, Any]],
+    *,
+    city: str | None = None,
+) -> str:
+    payload = {
+        "property": {
+            "property_id": target["property_id"],
             "country": target["country"],
-            "city": target["city"],
+            "city": city if city is not None else target["city"],
             "property_name": target["canonical_name"],
             "scene_type": target["scene_type"],
         },

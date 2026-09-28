@@ -2,6 +2,7 @@ version: "0.1"
 excel:
   required_sheets:
     - 主表
+    - 推荐清单
     - 证据表
     - 推测留痕
     - Proxy模型
@@ -17,6 +18,7 @@ excel:
     - 医院
     - 大学
     - 交通枢纽
+    - 清真寺
   main_columns:
     - 国家
     - 城市
@@ -25,6 +27,7 @@ excel:
     - 纬度
     - 场景类型
     - 物业点重要证据
+    - 主指标量化值
     - 年访问量估计（基于Proxy）
     - 忙时流量（GB/h，基于Proxy）
     - 当前有无室分建设
@@ -33,8 +36,22 @@ excel:
     - 室分类型
     - 证据提纯批次
     - 证据状态
+    - 是否被推荐
     - 推荐理由
     - 下一步核验动作
+    - Google地图链接
+  recommendation_columns:
+    - 国家
+    - 城市
+    - 物业名
+    - 场景类型
+    - 推荐排名
+    - 推荐门槛
+    - 门槛指标
+    - 门槛指标值
+    - 物业点重要证据
+    - 年访问量估计（基于Proxy）
+    - 推荐理由
     - Google地图链接
   evidence_columns:
     - 行号
@@ -86,9 +103,149 @@ excel:
     - 医院
     - 大学
     - 交通枢纽
+    - 清真寺
   sorting_rules:
-    main_table: 主表物业点按年访问量估计（基于Proxy）从高到低排序；缺失年访问量的物业点排在末尾。
-    scene_sheets: 各场景分表按该场景已选物业点重要证据中的主指标数值从高到低排序；缺失或非数值主指标的物业点排在末尾。
+    main_table: 主表物业点按年访问量估计（基于Proxy）从高到低排序；缺失年访问量的物业点排在末尾；“主指标量化值”位于“物业点重要证据”右侧，从当前选中的物业点重要证据中提取纯数字，便于 Excel 一键排序。
+    scene_sheets: 各场景分表先按场景指标优先级排序，再按已选物业点重要证据中的主指标数值从高到低排序；缺失或非数值主指标的物业点排在末尾。
+  recommendation_rules:
+    target_count_per_country_scene: 10
+    default_gate_mode: scene_fixed_first_class_threshold
+    metric_identity_gpt:
+      applies_to_all_scenes: true
+      mode: rules_precheck_gpt_normalization
+      enabled_env: ISITE2_RECOMMENDATION_METRIC_GPT（默认 auto：存在 Codex OAuth 登录态时启用；设为 0/off 可关闭）
+      provider_env: ISITE2_RECOMMENDATION_METRIC_GPT_PROVIDER（默认 codex-oauth；只有显式 gpt/openai 才使用 OpenAI API Key）
+      cache_dir_env: ISITE2_RECOMMENDATION_METRIC_CACHE_DIR
+      min_confidence: 0.72
+      allowed_output: GPT 只能返回当前场景允许的 canonical metric key；推荐门槛仍由项目规则决定。
+    default_scene_gates:
+      airport_terminal:
+        metric_keys: [annual_passenger_throughput, passenger_throughput, terminal_capacity, passenger_capacity]
+        operator: ">"
+        value: 2000000
+        threshold_text_zh: 年旅客吞吐/年处理能力 > 2,000,000 人次/年
+        threshold_text_en: Annual passengers / annual terminal capacity > 2M
+      convention_center:
+        metric_keys: [exhibition_area, meeting_area]
+        operator: ">"
+        value: 25000
+        threshold_text_zh: 会展中心面积 > 25,000 平方米
+        threshold_text_en: Exhibition Area > 25,000 sqm
+      transport_hub:
+        metric_keys: [line_count]
+        operator: ">"
+        value: 1
+        threshold_text_zh: 换乘线路数 > 1 条
+        threshold_text_en: Interchange Lines > 1
+      stadium:
+        metric_keys: [seat_count]
+        operator: ">"
+        value: 20000
+        threshold_text_zh: 座位数 > 20,000
+        threshold_text_en: Seats > 20,000
+      mall_mixed_use:
+        metric_keys: [gla]
+        operator: ">"
+        value: 120000
+        threshold_text_zh: GLA > 120,000 平方米
+        threshold_text_en: GLA > 120,000 sqm
+      office_government:
+        metric_keys: [tower_height]
+        operator: ">"
+        value: 150
+        threshold_text_zh: 楼高 > 150 米
+        threshold_text_en: Building Height > 150 m
+      luxury_hotel_mice:
+        metric_keys: [keys, room_count]
+        operator: ">"
+        value: 150
+        threshold_text_zh: 房间数 > 150 间
+        threshold_text_en: Rooms > 150
+      hospital:
+        metric_keys: [beds]
+        operator: ">"
+        value: 450
+        threshold_text_zh: 床位数 > 450 张
+        threshold_text_en: Beds > 450
+      university:
+        metric_keys: [enrollment]
+        operator: ">="
+        value: 20000
+        threshold_text_zh: 单一实体校园在校生人数 >= 20,000 人
+        threshold_text_en: Single-campus enrollment >= 20,000
+      mosque:
+        metric_keys: [mosque_area, gross_floor_area, prayer_hall_area, site_area, built_up_area]
+        operator: ">"
+        value: 20000
+        threshold_text_zh: 清真寺面积 > 20,000 平方米
+        threshold_text_en: Mosque Area > 20,000 sqm
+    threshold_rule: 优先使用项目级固定 First Class 推荐门槛；已配置场景按对应硬主指标和配置的比较符判断。大学仅接受单一实体校园在校生总数，不接受大学系统、多校区合计或在线学生汇总。未配置固定门槛的场景，仍按国家+场景当前可用一级硬主指标排序，默认取第10名整数主指标值为回退推荐门槛。
+    highlight_rule: 主表和各场景分表中达到推荐门槛的物业点以浅黄色高亮，“是否被推荐”列填 yes，并同步写入推荐清单页签。
+    fallback_rule: 候选或硬指标不足10个时，具备硬主指标的候选全量推荐；没有量化硬主指标的物业点不进入推荐清单。
+    style_rule: 主表和各场景分表不做隔行底色；只有达到推荐门槛的物业点整行使用淡黄色填色。
+report_bundle:
+  default_when_user_requests_country_report: true
+  preflight_qa: 生成 Excel/PPT/邮件交付前必须先阅读 docs/15_qa_lessons_learned.md；本轮发现的新问题先追加到经验库，再交付输出件。
+  batch_generation:
+    script: scripts/generate_standard_country_report.py
+    country_argument: --country 可重复传入；多国不得逐国重复启动脚本
+    shared_inputs: [site_packet_payload, recommendation_decisions, representative_image_assets]
+    smoke_rule: 先生成场景数最多的国家并通过确定性规则审计，再并行生成其余国家
+    parallel_workers_default: 4
+    gpt_audit_scope: 全批一次 Codex OAuth 调用，规则审计仍逐国执行
+    content_hash_reuse: 哈希覆盖数据、配置、模板、生成和审计代码、QA经验库；哈希一致且上一版审计通过、四件套完整时直接复用
+    stage_timing_required: [payloads_ready, reuse_checked, ppt_assets_ready, smoke_generated, smoke_passed, country_generated, batch_audit_completed]
+  post_output_audit:
+    required: true
+    script: scripts/qa_standard_report_output_bundle.py
+    gpt_provider: codex-oauth
+    rule: Excel/PPT 文档产出后必须先执行规则审计和 Codex OAuth GPT 审计；审计失败不得打包、发送或对外交付。
+    hard_checks:
+      - PPT 一页版场景卡或两页版第二页的推荐点指标值必须与 Excel 推荐清单“门槛指标值”逐条一致
+      - GPT 审计必须读取规则审计结果和 docs/15_qa_lessons_learned.md 经验摘要
+      - 机场、酒店、商超、体育场、会展、办公、医院、交通枢纽等场景不得把非主指标数字展示为主指标
+      - 审计失败时必须先修复源逻辑或重新生成输出件，再重新审计
+  languages: [zh, en]
+  email:
+    default_cc:
+      - Steve.zengchuxian@huawei.com
+      - liaozhaomu@huawei.com
+      - zhangming.dis@huawei.com
+      - luojiangtao@huawei.com
+    alias_map:
+      zengchuxian: Steve.zengchuxian@huawei.com
+      liaozhaomu: liaozhaomu@huawei.com
+    delivery_rule: 发送看网报告、扫网报告、标准输出件或报告附件时，除非用户明确要求不抄送，默认加入 default_cc；用户额外指定抄送人时在此基础上追加去重。
+  excel:
+    use_template: excel
+    required_features:
+      - 主表按预计年访问量从高到低排序
+      - 主表和场景分表均在“物业点重要证据”右侧输出“主指标量化值”，从物业点重要证据中提取数值，便于一键排序
+      - 场景分表按场景主指标从高到低排序
+      - 根据推荐门槛高亮推荐候选点
+      - 主表和场景分表增加“是否被推荐”列，推荐点填 yes
+      - 推荐清单页签汇总全部推荐物业点
+      - 方法说明页签记录推荐门槛规则
+  ppt:
+    default_variant: one_page
+    one_page:
+      template_zh: templates/ppt/isite_standard_one_page_zh.pptx
+      template_en: templates/ppt/isite_standard_one_page_en.pptx
+      max_scene_cards: 9
+      overflow_scene_rule: 超过9类场景时仅在PPT展示层按项目场景优先级选择前9类；Excel和底层候选池保持全量，图片门只检查实际展示场景。
+      design_reference: templates/ppt/isite_standard_one_page_imagen_reference.png
+      layout_rule: 单页上部保留标题、候选/推荐/场景 KPI 和四步找楼流程；下部按场景排布融合卡片，不另设独立统计区或独立推荐清单区。
+      fusion_rule: 每张场景卡必须同时展示候选数、推荐数、项目级推荐门槛、代表物业点全称、同口径硬主指标、达标状态和该物业真实图片。
+      editability_rule: Imagen 生成结果只用于美化方向和版式参考；最终 PPT 的文字、数字、卡片、流程、图标和图片均以原生可编辑对象重建，不得把整页栅格化后冒充可编辑模板。
+      image_rule: 场景案例必须使用与物业身份一致的真实图片；生成图不能替代真实物业图，找不到真实图片的物业不得作为单页案例。
+      localization_rule: 默认同时输出中英文两份；两种语言必须使用同一候选、推荐和主指标数据，只做本地化表达，不得分别计算。
+      update_rule: 复制模板后必须替换目标国家标题、KPI、全部场景卡文字、代表物业和图片；不得残留 Ghana 示例内容。
+    detailed_variant: two_page
+    slide_1: 固定使用“AI工具——找楼逻辑”方法论页；标题不得出现“-iSite/iSite”；去掉中间通栏方法论说明；各场景说明栏必须展示对应项目级 First Class 推荐门槛，并保留分场景指标选择和主指标高亮；案例换成目标国家真实物业点。
+    slide_2: 沿用候选池规模统计页的格式和框架；内容必须替换为目标国家强相关统计和推荐物业点，不展示推荐门槛文字；每个国家统计卡必须同时展示候选点总数和推荐点总数。
+    typography_rule: 单页版和两页详细版均优先保证标题、流程、场景栏和统计信息可读；放大后必须通过渲染 QA，确认标题、卡片、表格、国家统计卡和案例说明不越框。
+    recommendation_total_rule: PPT 推荐点总数必须与 Excel 推荐清单和“是否被推荐=yes”行使用同一推荐门槛口径，不能使用未过质量门或未进入推荐清单的点位计数。
+    naming_rule: PPT与Excel中的物业点名称必须显示全称，不使用省略号截断；空间不足时通过换行、缩小字号或减少同格列举数量解决。
 ppt_card:
   required_fields:
     - site_name

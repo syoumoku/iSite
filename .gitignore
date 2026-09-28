@@ -19,3 +19,24 @@ ui/world_map/test-results/
 .secrets/
 {}
 .codex/config.toml
+
+# Local evidence, databases, releases and private handover assets
+.web_evidence/
+.backups/
+.build/
+.codex-build/
+.codex_artifacts/
+.handover-private/
+.ruff_cache/
+data/
+output/
+public_reports/
+*.db
+*.db-*
+*.sqlite3
+*.before*
+*.env
+.env.*
+!.env.example
+!*.env.example
+playwright-report/

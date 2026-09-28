@@ -1,9 +1,9 @@
 {$ISITE2_PUBLIC_DOMAIN} {
-	encode zstd gzip
+	route {
+		redir / /ui/ 308
 
-	basicauth {
-		{$ISITE2_BASIC_AUTH_USER} {$ISITE2_BASIC_AUTH_HASH}
+		encode zstd gzip
+
+		reverse_proxy web:8000
 	}
-
-	reverse_proxy web:8000
 }

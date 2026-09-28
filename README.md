@@ -1,68 +1,46 @@
-# iSite2 Codex Starter Pack
+# iSite2
 
-面向 Codex 开发的 iSite2 多 agent 扫网产品启动包。目标是把上传的 iSite Skill 转成一套可开发、可测试、可扩展的工程骨架，而不是只停留在报告模板。
+基于公开证据的高价值楼宇与室内覆盖机会扫描产品。包含多语言候选发现、字段级证据、分场景模型、独立现网状态、需求估算、世界地图、Excel/PPT 输出与独立运营提单。
 
-## 一句话产品定义
+## 接手从这里开始
 
-iSite2 是一个面向高价值楼宇室分机会识别的自动化 AI 产品：后台按国家/区域/城市滚动扫描公开证据，建立高价值楼宇候选池，按场景模型提取主指标与证据链，独立判断现网建设状态，计算需求链路，输出 Excel、PPT 洞察卡和世界地图 UI。
+**[完整交接文档](docs/16_handover.md)** 是人员和 AI agent 的统一入口。当前实现为 Python/FastAPI + React/Vite + PostgreSQL/SQLite，早期启动包 README 已存档到 `docs/00_starter_readme.md`。
 
-## Codex 开发入口
+| 文档 | 用途 |
+| --- | --- |
+| [交接总册](docs/16_handover.md) | 产品、架构、流程、数据口径、日常操作、代码索引 |
+| [Codex 常用 Prompt](docs/17_codex_prompt_playbook.md) | 可复制的接手、扫网、补证、QA、发布、开发和交班任务 |
+| [部署与恢复手册](docs/18_deployment_runbook.md) | 本地启动、Firecrawl、Docker 网站部署、发布、备份与回滚 |
+| [交接清单与验收记录](docs/19_handover_inventory.md) | 本次验证、资产边界、权限和遗留问题 |
 
-1. 把整个 `isite2_codex_starter_pack` 放进新 repo 根目录。
-2. 启动 Codex 前先让它读取：
-   - `AGENTS.md`
-   - `.agents/skills/isite2-scan/SKILL.md`
-   - `docs/02_architecture.md`
-   - `tasks/codex/00_bootstrap_foundation.md`
-3. 在 Codex 里可以直接用这个首条任务：
-
-```text
-请读取 AGENTS.md、.agents/skills/isite2-scan/SKILL.md 和 tasks/codex/00_bootstrap_foundation.md，按 iSite2 starter pack 实现第一阶段 MVP。保持证据优先、分场景建模、现网状态独立判断、推测留痕和 Review Queue 规则。
-```
-
-## 推荐技术栈
-
-- Backend: Python 3.11+, FastAPI, Pydantic v2, SQLAlchemy, Alembic
-- Queue: Celery/RQ + Redis；后续可升级 Temporal
-- DB: PostgreSQL + PostGIS
-- Crawler/Search connectors: 官方 API 优先；无 API 时使用受控网页抓取，必须遵守 robots.txt、限速、来源记录
-- Output: openpyxl / python-pptx
-- Frontend: Next.js + React + Mapbox/Leaflet
-- Agent runtime: 先用规则化 pipeline + LLM task adapter，后续再接 OpenAI Agents/Responses API 或 MCP 工具
-
-## 本包内容
+## 给接手 agent 的第一句话
 
 ```text
-AGENTS.md                         Codex 全局开发约束
-.agents/skills/isite2-scan/        Codex skill，触发 iSite2 工作流
-.codex/agents/                    Codex 自定义子 agent 配置
-docs/                             产品、架构、UI、合规、增长闭环说明
-docs/14_sweep_script_reuse.md     扫网脚本复用分层、标准动作链和 legacy 入口规则
-config/                           agent、场景、阶段门、输出模板配置
-schemas/                          JSON Schema 数据契约
-db/                               PostgreSQL/PostGIS schema 与种子数据
-api/openapi.yaml                  API 草案
-src/isite2/                       Python 后端最小代码骨架
-tests/                            合同与规则测试样例
-tasks/codex/                      让 Codex 分阶段开发的任务卡
-prompts/                          产品内 agent 提示词模板
-scripts/                          本地校验和模板生成脚本
+请先阅读 AGENTS.md、docs/16_handover.md、docs/19_handover_inventory.md、
+.agents/skills/isite2-scan/SKILL.md、docs/14_sweep_script_reuse.md、
+docs/15_qa_lessons_learned.md 和 config/qa_controls.yaml。
+核对当前 Git、运行环境、数据来源和服务状态，再按交接文档完成本地启动验收。
+不要把历史开发任务卡当作当前待办，不覆盖已有工作；缺少的数据或权限明确列出。
 ```
 
-## MVP 验收口径
+## 最小本地启动
 
-第一阶段只追求“跑通闭环”，不要急着把全球扫完：
+需要 Python 3.12、Node.js 22 和 npm。从仓库根目录运行，以下使用新建演示库：
 
-- 能创建一个国家级 scan run。
-- 能写入候选物业、证据、推测、现网状态、需求计算、结论、复核队列。
-- 能输出符合固定表头的 Excel skeleton。
-- 能返回地图点位 GeoJSON。
-- 能打开 `/ui/` 查看世界地图、筛选 KPI、点位详情 drawer、证据/推测/复核 tab。
-- 所有推测能追溯，所有 Review Queue 有具体下一步动作。
+```bash
+python3.12 -m venv .venv
+.venv/bin/python -m pip install -e '.[dev]'
+npm --prefix ui/world_map ci
+npm --prefix ui/world_map run build
+mkdir -p outputs
+export PYTHONPATH=src
+export DATABASE_URL=sqlite+pysqlite:///outputs/isite2_demo.db
+export ISITE2_OPS_DATABASE_URL=sqlite+pysqlite:///outputs/isite2_demo_ops.db
+export ISITE2_ENABLE_OVERLAY_SYNC=0
+export ISITE2_ENABLE_DERIVED_REFRESH_AFTER_SCAN=0
+.venv/bin/python -m uvicorn isite2.api.main:app --host 127.0.0.1 --port 8000
+```
 
-## 非目标
+打开 `http://127.0.0.1:8000/ui/`，健康检查 `/health`。空演示库无业务点位属正常；恢复真实数据后按部署手册切换数据库。
 
-- 不做工程级室分设计图。
-- 不做精确预算。
-- 不替代现场勘察。
-- 不进行网络端口扫描或任何入侵式探测；“扫网”仅指公开网页/公开数据证据扫描。
+代码、模板和配置进入 Git；数据库、证据缓存、真实环境文件与凭据单独交接。`AGENTS.md` 为工程约束，`config/qa_controls.yaml` 为 QA 控制索引。旧 `docs/01`–`docs/13`、`tasks/codex/` 中部分内容是设计历史，操作步骤以当前代码和交接册为准。

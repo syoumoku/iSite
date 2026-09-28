@@ -1,0 +1,316 @@
+version: "1.0"
+history_archive: docs/qa_archive/2026_history_through_2026-08-10.md
+active_guide: docs/15_qa_lessons_learned.md
+enforcement_policy:
+  automated_requires: [rule_refs, test_refs]
+  manual_requires: [runbook_ref, artifact_required]
+  release_blocking_severities: [critical, high]
+controls:
+  - id: QA-SCAN-001
+    title: Full candidate pool is never truncated by Top N
+    domain: scan
+    severity: critical
+    enforcement: automated
+    rule_refs: [src/isite2/rules/validation.py, config/output_templates.yaml]
+    test_refs: [tests/test_config_rules.py]
+  - id: QA-SCAN-002
+    title: Local-language discovery and retained manifests precede fallback search
+    domain: scan
+    severity: high
+    enforcement: automated
+    rule_refs: [config/localized_search_strategy.yaml, config/firecrawl_search_strategy.yaml]
+    test_refs: [tests/test_localized_search_strategy.py, tests/test_search_manifest_provider.py]
+  - id: QA-SCAN-003
+    title: Deep expansion uses source breadth then city-scene precision search
+    domain: scan
+    severity: high
+    enforcement: manual
+    runbook_ref: docs/15_qa_lessons_learned.md#manual-gates
+    artifact_required: true
+  - id: QA-SCAN-004
+    title: Country additions remain balanced across priority scenes
+    domain: scan
+    severity: medium
+    enforcement: manual
+    runbook_ref: docs/15_qa_lessons_learned.md#manual-gates
+    artifact_required: true
+  - id: QA-FIRE-001
+    title: Automated Firecrawl uses the local wrapper and retains manifests
+    domain: acquisition
+    severity: high
+    enforcement: automated
+    rule_refs: [scripts/run_firecrawl_cli.py, config/firecrawl_search_strategy.yaml]
+    test_refs: [tests/test_firecrawl_cli.py, tests/test_search_manifest_provider.py]
+  - id: QA-ACQUIRE-001
+    title: Explicit acquisition providers take precedence over optional installed adapters
+    domain: acquisition
+    severity: high
+    enforcement: automated
+    rule_refs: [src/isite2/growth/hybrid_discovery.py]
+    test_refs: [tests/test_hybrid_discovery.py]
+  - id: QA-IDENTITY-001
+    title: Property identity and URL dedup prevent repeated acquisition and storage
+    domain: identity
+    severity: critical
+    enforcement: automated
+    rule_refs: [src/isite2/growth/property_identity.py, src/isite2/repositories/sqlalchemy.py]
+    test_refs: [tests/test_property_identity.py, tests/test_repository_sqlalchemy.py]
+  - id: QA-SEARCH-001
+    title: Multilingual property search preserves non-Latin letter composition
+    domain: identity
+    severity: high
+    enforcement: automated
+    rule_refs: [src/isite2/property_search.py, src/isite2/repositories/sqlalchemy.py]
+    test_refs: [tests/test_property_search.py, tests/test_api.py, ui/world_map/tests/globe-smoke.spec.ts]
+  - id: QA-ENTITY-001
+    title: City and coordinates must describe the observed property entity
+    domain: entity
+    severity: critical
+    enforcement: automated
+    rule_refs: [src/isite2/rules/candidate_quality.py, config/candidate_quality.yaml]
+    test_refs: [tests/test_candidate_quality.py, tests/test_agent_scene_candidate_import.py]
+  - id: QA-ENTITY-002
+    title: Canonical cities use official deterministic mappings and preserve source localities
+    domain: entity
+    severity: critical
+    enforcement: automated
+    rule_refs: [src/isite2/growth/city_normalization.py, src/isite2/growth/global_city_registry.py, scripts/run_city_normalization_refresh.py, scripts/publish_public_country_delta.py, config/city_admin_sources.yaml]
+    test_refs: [tests/test_city_normalization.py, tests/test_public_country_delta.py, tests/test_repository_sqlalchemy.py, tests/test_api.py]
+  - id: QA-EVIDENCE-001
+    title: Scene primary metrics are canonical, quantitative, and source-traceable
+    domain: evidence
+    severity: critical
+    enforcement: automated
+    rule_refs: [src/isite2/rules/metric_identity.py, src/isite2/rules/metric_safety.py, config/scenes.yaml]
+    test_refs: [tests/test_raw_evidence_metric_extraction.py, tests/test_candidate_quality.py]
+  - id: QA-TRAFFIC-001
+    title: Years, property IDs, lines, daily values, and event values cannot pollute annual visits
+    domain: traffic
+    severity: critical
+    enforcement: automated
+    rule_refs: [src/isite2/rules/traffic.py, src/isite2/growth/derived_refresh.py, scripts/run_apac_other_scene_agent_import.py]
+    test_refs: [tests/test_traffic_v2.py, tests/test_derived_refresh.py, tests/test_agent_scene_candidate_import.py]
+  - id: QA-BUILD-001
+    title: Property value evidence remains separate from indoor build-status evidence
+    domain: build_status
+    severity: critical
+    enforcement: automated
+    rule_refs: [config/gates.yaml, src/isite2/orchestrator/pipeline.py]
+    test_refs: [tests/test_gates.py, tests/test_pipeline.py]
+  - id: QA-DERIVED-001
+    title: Derived analysis refreshes only when evidence hash or model version changes
+    domain: derived
+    severity: high
+    enforcement: automated
+    rule_refs: [src/isite2/growth/derived_refresh_trigger.py, src/isite2/growth/derived_refresh.py]
+    test_refs: [tests/test_derived_refresh.py]
+  - id: QA-PIPELINE-001
+    title: Final evidence or image sync precedes scoped derived and localization refresh
+    domain: derived
+    severity: critical
+    enforcement: automated
+    rule_refs: [src/isite2/growth/overlay_sync.py, src/isite2/growth/derived_refresh_trigger.py]
+    test_refs: [tests/test_overlay_sync.py, tests/test_derived_refresh.py]
+  - id: QA-LEAD-001
+    title: Designated leads may waive only the primary metric and remain Survey First
+    domain: evidence
+    severity: high
+    enforcement: automated
+    rule_refs: [src/isite2/rules/candidate_quality.py, src/isite2/growth/derived_refresh.py]
+    test_refs: [tests/test_candidate_quality.py, tests/test_derived_refresh.py, tests/test_overlay_sync.py]
+  - id: QA-IMAGE-001
+    title: Hero images reject placeholders and invalid assets
+    domain: image
+    severity: high
+    enforcement: automated
+    rule_refs: [scripts/run_apac_image_and_duplicate_gate.py, src/isite2/media/hero_images.py]
+    test_refs: [tests/test_candidate_image_gate.py, tests/test_agent_scene_candidate_import.py]
+  - id: QA-IMAGE-002
+    title: Image-only changes update overlay even when evidence content is unchanged
+    domain: image
+    severity: high
+    enforcement: automated
+    rule_refs: [scripts/run_apac_other_scene_agent_import.py, src/isite2/growth/evidence_intake.py]
+    test_refs: [tests/test_agent_scene_candidate_import.py, tests/test_evidence_curation.py]
+  - id: QA-IMAGE-003
+    title: Image content must visually match the exact property
+    domain: image
+    severity: high
+    enforcement: manual
+    runbook_ref: docs/15_qa_lessons_learned.md#manual-gates
+    artifact_required: true
+  - id: QA-IMAGE-004
+    title: Image proxy URLs must resolve to a durable absolute source URL before curation
+    domain: image
+    severity: high
+    enforcement: automated
+    rule_refs: [scripts/run_cvent_apac_candidate_expansion.py]
+    test_refs: [tests/test_cvent_candidate_expansion_parser.py]
+  - id: QA-IMAGE-005
+    title: Missing-image release requires three retained independent search attempts
+    domain: image
+    severity: high
+    enforcement: automated
+    rule_refs: [scripts/run_apac_image_and_duplicate_gate.py]
+    test_refs: [tests/test_candidate_image_gate.py]
+  - id: QA-LOCAL-001
+    title: Localization cache hits must be persisted, valid, and language-correct
+    domain: localization
+    severity: critical
+    enforcement: automated
+    rule_refs: [src/isite2/localization.py, src/isite2/growth/localization_refresh.py]
+    test_refs: [tests/test_localization.py]
+  - id: QA-LOCAL-002
+    title: Translation preserves numbers, years, URLs, canonical keys, units, and names
+    domain: localization
+    severity: critical
+    enforcement: automated
+    rule_refs: [src/isite2/localization.py, src/isite2/growth/localization_refresh.py]
+    test_refs: [tests/test_localization.py]
+  - id: QA-PUBLISH-001
+    title: Public preaggregation blocks cache misses and pending localization text
+    domain: publication
+    severity: critical
+    enforcement: automated
+    rule_refs: [scripts/publish_public_country_delta.py, src/isite2/public_api_preaggregation.py]
+    test_refs: [tests/test_public_country_delta.py, tests/test_public_snapshot_publish.py]
+  - id: QA-PUBLISH-002
+    title: Latest public counts are distinct from historical property-table counts
+    domain: publication
+    severity: high
+    enforcement: automated
+    rule_refs: [src/isite2/repositories/sqlalchemy.py, scripts/publish_public_country_delta.py]
+    test_refs: [tests/test_repository_sqlalchemy.py, tests/test_public_country_delta.py]
+  - id: QA-PUBLISH-003
+    title: Property-scoped deltas cannot replace unrelated historical country rows
+    domain: publication
+    severity: critical
+    enforcement: automated
+    rule_refs: [scripts/publish_public_country_delta.py]
+    test_refs: [tests/test_public_country_delta.py]
+  - id: QA-PUBLISH-004
+    title: Latest candidate selection is deterministic when candidate timestamps tie
+    domain: publication
+    severity: critical
+    enforcement: automated
+    rule_refs: [src/isite2/repositories/sqlalchemy.py]
+    test_refs: [tests/test_repository_sqlalchemy.py]
+  - id: QA-REPORT-001
+    title: Public reports activate atomically with audited data fingerprints and hashes
+    domain: publication
+    severity: high
+    enforcement: automated
+    rule_refs: [src/isite2/public_reports.py, src/isite2/api/main.py]
+    test_refs: [tests/test_api.py, tests/test_public_reports.py, tests/test_public_country_delta.py]
+  - id: QA-UI-001
+    title: API failures cannot be displayed as a false No visible points state
+    domain: ui
+    severity: high
+    enforcement: automated
+    rule_refs: [ui/world_map/src/main.tsx]
+    test_refs: [ui/world_map/tests/globe-smoke.spec.ts]
+  - id: QA-UI-002
+    title: Transparent map overlays cannot intercept marker interactions
+    domain: ui
+    severity: high
+    enforcement: automated
+    rule_refs: [ui/world_map/src/styles.css]
+    test_refs: [ui/world_map/tests/globe-smoke.spec.ts]
+  - id: QA-UI-003
+    title: City scope rows display candidate counts rather than map-ready counts
+    domain: ui
+    severity: medium
+    enforcement: automated
+    rule_refs: [ui/world_map/src/main.tsx]
+    test_refs: [ui/world_map/tests/globe-smoke.spec.ts]
+  - id: QA-OUTPUT-001
+    title: Excel and PPT share canonical metrics but use artifact-specific quality gates
+    domain: output
+    severity: high
+    enforcement: automated
+    rule_refs: [scripts/generate_standard_country_report.py, scripts/qa_standard_report_output_bundle.py, src/isite2/public_reports.py, config/output_templates.yaml]
+    test_refs: [tests/test_standard_report_output_audit.py, tests/test_excel_output.py, tests/test_ppt_output.py]
+  - id: QA-OUTPUT-002
+    title: Rendered output is visually inspected for images, clipping, and full names
+    domain: output
+    severity: medium
+    enforcement: manual
+    runbook_ref: docs/15_qa_lessons_learned.md#manual-gates
+    artifact_required: true
+  - id: QA-OUTPUT-003
+    title: Scene primary metrics must pass metric-specific plausibility ceilings before report activation
+    domain: output
+    severity: critical
+    enforcement: automated
+    rule_refs: [scripts/qa_standard_report_ppt_metrics.py]
+    test_refs: [tests/test_standard_report_output_audit.py]
+  - id: QA-OUTPUT-004
+    title: Confirmed-count reports use one property-level evidence rule for zero and non-zero cells
+    domain: output
+    severity: high
+    enforcement: manual
+    runbook_ref: docs/15_qa_lessons_learned.md#manual-gates
+    artifact_required: true
+  - id: QA-REVIEW-001
+    title: Review queue actions are concrete and executable
+    domain: review
+    severity: high
+    enforcement: automated
+    rule_refs: [src/isite2/rules/validation.py, src/isite2/orchestrator/pipeline.py]
+    test_refs: [tests/test_pipeline.py, tests/test_config_rules.py]
+  - id: QA-NETWORK-001
+    title: Complaints and Ookla remain separate, privacy-safe network proxies
+    domain: network
+    severity: high
+    enforcement: automated
+    rule_refs: [src/isite2/growth/network_signals.py, src/isite2/growth/ookla_refresh.py]
+    test_refs: [tests/test_network_signals.py, tests/test_ookla_network.py, tests/test_backend_signal_persistence.py]
+  - id: QA-REQUEST-001
+    title: Operational requests and contact PII never enter the public snapshot data plane
+    domain: service_requests
+    severity: critical
+    enforcement: automated
+    rule_refs: [src/isite2/service_requests.py, scripts/publish_public_snapshot.py]
+    test_refs: [tests/test_service_requests.py]
+  - id: QA-REQUEST-002
+    title: Request execution requires exact authenticated approval and valid state transitions
+    domain: service_requests
+    severity: critical
+    enforcement: automated
+    rule_refs: [src/isite2/service_requests.py, src/isite2/api/main.py, scripts/service_request_admin.py]
+    test_refs: [tests/test_service_requests.py]
+  - id: QA-REQUEST-003
+    title: Request submission delivery and public update publication are idempotent and release-gated
+    domain: service_requests
+    severity: critical
+    enforcement: automated
+    rule_refs: [src/isite2/service_requests.py, scripts/service_request_admin.py]
+    test_refs: [tests/test_service_requests.py]
+  - id: QA-REQUEST-004
+    title: Multi-scene scan requests preserve one combined target and verify custom locations
+    domain: service_requests
+    severity: high
+    enforcement: automated
+    rule_refs: [src/isite2/service_requests.py, src/isite2/api/main.py, scripts/service_request_admin.py]
+    test_refs: [tests/test_service_requests.py, ui/world_map/tests/globe-smoke.spec.ts]
+  - id: QA-COMPLIANCE-001
+    title: Acquisition does not bypass login, CAPTCHA, paywalls, robots, or terms
+    domain: compliance
+    severity: critical
+    enforcement: manual
+    runbook_ref: docs/15_qa_lessons_learned.md#manual-gates
+    artifact_required: true
+  - id: QA-INPUT-001
+    title: Spreadsheet coordinates, formulas, display text, and hyperlink targets are audited separately
+    domain: input
+    severity: high
+    enforcement: manual
+    runbook_ref: docs/15_qa_lessons_learned.md#manual-gates
+    artifact_required: true
+  - id: QA-OPS-001
+    title: Public deployment passes service, disk, memory, and container health gates
+    domain: operations
+    severity: critical
+    enforcement: manual
+    runbook_ref: docs/15_qa_lessons_learned.md#manual-gates
+    artifact_required: true

@@ -1,5 +1,7 @@
 FROM node:22-alpine AS ui-build
 
+ENV NODE_OPTIONS=--max-old-space-size=1024
+
 WORKDIR /app/ui/world_map
 COPY ui/world_map/package.json ui/world_map/package-lock.json ./
 RUN npm ci

@@ -1,4 +1,7 @@
 # Run from the local scanning machine. Copy into crontab after replacing paths and hosts.
 # Daily 02:30 Asia/Shanghai.
 CRON_TZ=Asia/Shanghai
-30 2 * * * cd /Users/zhaomuliao/Downloads/isite2_codex_starter_pack && DATABASE_URL='postgresql+psycopg://isite:isite@127.0.0.1:5432/isite2' ISITE2_PUBLIC_SSH_TARGET='deploy@isite2.example.com' .venv/bin/python scripts/publish_public_snapshot.py --remote-dir /opt/isite2 >> outputs/public_snapshot_publish.log 2>&1
+# Replace /srv/isite2-worker and load DATABASE_URL / SSH target from a private
+# environment file. Full snapshots are for an explicitly approved full release;
+# prefer property-scoped deltas for routine changes. See docs/18_deployment_runbook.md.
+30 2 * * * cd /srv/isite2-worker && set -a && . ./.secrets/publish.env && set +a && .venv/bin/python scripts/publish_public_snapshot.py --remote-dir /opt/isite2 >> outputs/public_snapshot_publish.log 2>&1

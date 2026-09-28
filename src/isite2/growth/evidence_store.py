@@ -251,6 +251,7 @@ class EvidenceCurationStore:
                     "matched_property_name": draft.matched_property_name,
                     "identity_match_reason": draft.identity_match_reason,
                     "hero_image": draft.hero_image,
+                    "assumption_note": draft.assumption_note,
                 },
             )
             session.add(raw)
@@ -830,6 +831,7 @@ def raw_evidence_to_candidate_draft(raw: RawEvidenceItemDB) -> CandidateDraft:
         matched_property_name=payload.get("matched_property_name"),
         identity_match_reason=payload.get("identity_match_reason"),
         hero_image=payload.get("hero_image"),
+        assumption_note=payload.get("assumption_note"),
     )
 
 
@@ -1066,6 +1068,7 @@ def raw_evidence_content_hash(
         "source_url": draft.source_url,
         "source_date": draft.source_date,
         "evidence_type": draft.evidence_type,
+        "assumption_note": draft.assumption_note,
         "content_text": content_text or "",
     }
     canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True)

@@ -1,9 +1,12 @@
 from isite2.rules.candidate_quality import (
     BLOCKED_QUALITY,
+    REVIEW_REQUIRED,
     READY,
+    apply_designated_lead_primary_metric_exception,
     evaluate_candidate_quality,
     is_city_or_country_only_name,
 )
+from isite2.domain.models import CandidateVisibility
 
 
 def test_candidate_quality_blocks_mvp_placeholder_name() -> None:
@@ -92,6 +95,20 @@ def test_candidate_quality_blocks_city_defaulted_to_country() -> None:
     assert "city appears defaulted to country" in quality.issues
 
 
+def test_candidate_quality_blocks_country_alias_as_city() -> None:
+    quality = evaluate_candidate_quality(
+        country="Cote d'Ivoire",
+        city="Ivory Coast",
+        property_name="Bouaké Airport",
+        scene_type="airport_terminal",
+        geocode_precision="airport terminal centroid",
+        source_urls=["https://en.wikipedia.org/wiki/Bouak%C3%A9_Airport"],
+    )
+
+    assert quality.status == BLOCKED_QUALITY
+    assert "city is an administrative region, not an observed city/locality" in quality.issues
+
+
 def test_candidate_quality_blocks_admin_region_as_city() -> None:
     quality = evaluate_candidate_quality(
         country="Maldives",
@@ -114,6 +131,64 @@ def test_candidate_quality_blocks_country_scoped_district_as_city() -> None:
         scene_type="mall_mixed_use",
         geocode_precision="mall venue centroid",
         source_urls=["https://example.org/reforma-222"],
+    )
+
+    assert quality.status == BLOCKED_QUALITY
+    assert "city is an administrative region, not an observed city/locality" in quality.issues
+
+
+def test_candidate_quality_blocks_vietnam_region_or_province_as_city() -> None:
+    quality = evaluate_candidate_quality(
+        country="Vietnam",
+        city="South Central Coast",
+        property_name="Da Nang International Airport",
+        scene_type="airport_terminal",
+        geocode_precision="airport terminal centroid",
+        source_urls=["https://example.org/da-nang-airport"],
+    )
+
+    assert quality.status == BLOCKED_QUALITY
+    assert "city is an administrative region, not an observed city/locality" in quality.issues
+
+    province_quality = evaluate_candidate_quality(
+        country="Vietnam",
+        city="Khanh Hoa",
+        property_name="Duyen Ha Resort Cam Ranh",
+        scene_type="luxury_hotel_mice",
+        geocode_precision="hotel venue centroid",
+        source_urls=["https://example.org/duyen-ha-resort-cam-ranh"],
+    )
+
+    assert province_quality.status == BLOCKED_QUALITY
+    assert (
+        "city is an administrative region, not an observed city/locality"
+        in province_quality.issues
+    )
+
+    airport_province_quality = evaluate_candidate_quality(
+        country="Vietnam",
+        city="Quang Binh",
+        property_name="Dong Hoi Airport",
+        scene_type="airport_terminal",
+        geocode_precision="airport terminal centroid",
+        source_urls=["https://example.org/dong-hoi-airport"],
+    )
+
+    assert airport_province_quality.status == BLOCKED_QUALITY
+    assert (
+        "city is an administrative region, not an observed city/locality"
+        in airport_province_quality.issues
+    )
+
+
+def test_candidate_quality_blocks_algeria_province_as_city() -> None:
+    quality = evaluate_candidate_quality(
+        country="Algeria",
+        city="Annaba Province",
+        property_name="Annaba Rabah Bitat Airport",
+        scene_type="airport_terminal",
+        geocode_precision="airport terminal centroid",
+        source_urls=["https://example.org/annaba-airport"],
     )
 
     assert quality.status == BLOCKED_QUALITY
@@ -174,7 +249,7 @@ def test_candidate_quality_allows_restricted_city_in_allowed_country() -> None:
     assert quality.issues == []
 
 
-def test_surface_quality_blocks_missing_hero_image_and_scene_metric() -> None:
+def test_surface_quality_allows_missing_hero_image_but_blocks_missing_scene_metric() -> None:
     quality = evaluate_candidate_quality(
         country="Benin",
         city="Cotonou",
@@ -189,9 +264,89 @@ def test_surface_quality_blocks_missing_hero_image_and_scene_metric() -> None:
     )
 
     assert quality.status == BLOCKED_QUALITY
-    assert "hero_image missing or invalid for UI map surface" in quality.issues
+    assert "hero_image missing or invalid for UI map surface" not in quality.issues
     assert "scene objective evidence metric missing" in quality.issues
     assert quality.visibility.map_ready is False
+
+
+def test_surface_quality_blocks_unverified_city_assignment() -> None:
+    quality = evaluate_candidate_quality(
+        country="Mexico",
+        city="Acolman",
+        property_name="Example General Hospital",
+        scene_type="hospital",
+        geocode_precision="property centroid",
+        source_urls=["https://hospital.example/facts"],
+        source_names=["Official hospital profile"],
+        evidence_field_groups=["licensed_beds"],
+        evidence_indicator_names=["licensed_beds"],
+        city_assignment_status="unmapped",
+        require_surface_assets=True,
+    )
+
+    assert quality.status == BLOCKED_QUALITY
+    assert "city assignment is not verified" in quality.issues
+
+
+def test_designated_lead_exception_only_allows_missing_primary_metric() -> None:
+    quality = evaluate_candidate_quality(
+        country="Algeria",
+        city="Algiers",
+        property_name="Designated Office Tower",
+        scene_type="office_government",
+        geocode_precision="office building centroid",
+        source_urls=["https://example.org/designated-office"],
+        source_names=["Official property profile"],
+        evidence_field_groups=["property_identity"],
+        evidence_indicator_names=["property_identity"],
+        evidence_types=["Context"],
+        evidence_values=["Exact building identity confirmed"],
+        require_surface_assets=True,
+    )
+    packet = type(
+        "PacketStub",
+        (),
+        {
+            "candidate_quality_status": quality.status,
+            "visibility": CandidateVisibility(),
+            "quality_issues": [],
+        },
+    )()
+
+    exception = apply_designated_lead_primary_metric_exception(packet, quality)
+
+    assert exception.status == REVIEW_REQUIRED
+    assert exception.visibility.map_ready is True
+    assert exception.visibility.review_required is True
+    assert packet.quality_issues == ["scene objective evidence metric missing"]
+
+
+def test_designated_lead_exception_does_not_hide_entity_or_city_defects() -> None:
+    quality = evaluate_candidate_quality(
+        country="Algeria",
+        city="Algeria",
+        property_name="MVP Candidate Office",
+        scene_type="office_government",
+        geocode_precision="province centroid",
+        source_urls=["https://example.org/not-a-property"],
+        evidence_field_groups=["property_identity"],
+        evidence_indicator_names=["property_identity"],
+        require_surface_assets=True,
+    )
+    packet = type(
+        "PacketStub",
+        (),
+        {
+            "candidate_quality_status": quality.status,
+            "visibility": CandidateVisibility(),
+            "quality_issues": [],
+        },
+    )()
+
+    exception = apply_designated_lead_primary_metric_exception(packet, quality)
+
+    assert exception.status == BLOCKED_QUALITY
+    assert exception.visibility.map_ready is False
 
 
 def test_surface_quality_blocks_airport_gateway_role_as_primary_metric() -> None:
@@ -297,6 +452,48 @@ def test_surface_quality_allows_annual_airport_metric_from_quarter_sum() -> None
 
     assert quality.status == READY
     assert quality.issues == []
+
+
+def test_surface_quality_allows_mosque_area_or_visitor_metric() -> None:
+    quality = evaluate_candidate_quality(
+        country="United Arab Emirates",
+        city="Abu Dhabi",
+        property_name="Sheikh Zayed Grand Mosque",
+        scene_type="mosque",
+        geocode_precision="mosque building centroid",
+        source_urls=["https://www.szgmc.gov.ae/en"],
+        source_names=["Sheikh Zayed Grand Mosque Centre"],
+        hero_image_url="https://example.org/sheikh-zayed-grand-mosque.jpg",
+        evidence_field_groups=["mosque_area"],
+        evidence_indicator_names=["mosque_area"],
+        evidence_types=["Direct"],
+        evidence_values=["Mosque area: 22,412 square meters."],
+        require_surface_assets=True,
+    )
+
+    assert quality.status == READY
+    assert quality.issues == []
+
+
+def test_surface_quality_blocks_mosque_landmark_role_as_primary_metric() -> None:
+    quality = evaluate_candidate_quality(
+        country="United Arab Emirates",
+        city="Dubai",
+        property_name="Jumeirah Mosque",
+        scene_type="mosque",
+        geocode_precision="mosque building centroid",
+        source_urls=["https://example.org/jumeirah-mosque"],
+        source_names=["Tourism profile"],
+        hero_image_url="https://example.org/jumeirah-mosque.jpg",
+        evidence_field_groups=["landmark_role"],
+        evidence_indicator_names=["landmark_role"],
+        evidence_types=["Direct"],
+        evidence_values=["One of Dubai's most photographed mosques."],
+        require_surface_assets=True,
+    )
+
+    assert quality.status == BLOCKED_QUALITY
+    assert "scene objective evidence metric missing" in quality.issues
 
 
 def test_city_or_country_only_helper_is_exact_not_contains() -> None:

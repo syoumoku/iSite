@@ -1,0 +1,147 @@
+name: isite-firecrawl
+
+x-firecrawl-env: &firecrawl-env
+  REDIS_URL: redis://redis:6379
+  REDIS_RATE_LIMIT_URL: redis://redis:6379
+  PLAYWRIGHT_MICROSERVICE_URL: http://playwright-service:3000/scrape
+  POSTGRES_USER: ${POSTGRES_USER}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  POSTGRES_DB: ${POSTGRES_DB}
+  POSTGRES_HOST: nuq-postgres
+  POSTGRES_PORT: 5432
+  USE_DB_AUTHENTICATION: "false"
+  NUQ_RABBITMQ_URL: amqp://rabbitmq:5672
+  SEARXNG_ENDPOINT: ${SEARXNG_ENDPOINT:-http://host.docker.internal:8080}
+  SEARXNG_ENGINES: ${SEARXNG_ENGINES:-quark,yandex,duckduckgo web,360search,sogou}
+  SEARXNG_CATEGORIES: general
+  NUM_WORKERS_PER_QUEUE: ${NUM_WORKERS_PER_QUEUE:-4}
+  NUQ_WORKER_COUNT: ${NUQ_WORKER_COUNT:-1}
+  CRAWL_CONCURRENT_REQUESTS: ${CRAWL_CONCURRENT_REQUESTS:-6}
+  MAX_CONCURRENT_JOBS: ${MAX_CONCURRENT_JOBS:-4}
+  BROWSER_POOL_SIZE: ${BROWSER_POOL_SIZE:-2}
+  MAX_CPU: ${MAX_CPU:-0.90}
+  MAX_RAM: ${MAX_RAM:-0.90}
+  BULL_AUTH_KEY: ${BULL_AUTH_KEY}
+  LOGGING_LEVEL: ${LOGGING_LEVEL:-info}
+  NODE_OPTIONS: ${NODE_OPTIONS:---max-old-space-size=512}
+  MALLOC_ARENA_MAX: "2"
+
+services:
+  api:
+    image: ghcr.io/firecrawl/firecrawl:${FIRECRAWL_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      <<: *firecrawl-env
+      HOST: 0.0.0.0
+      PORT: 3002
+      INTERNAL_PORT: 3002
+      ENV: local
+      HARNESS_STARTUP_TIMEOUT_MS: 300000
+    command: ["sh", "/usr/local/bin/isite-firecrawl-start"]
+    volumes:
+      - ./start-local.sh:/usr/local/bin/isite-firecrawl-start:ro
+    depends_on:
+      redis:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+      nuq-postgres:
+        condition: service_healthy
+      playwright-service:
+        condition: service_started
+    ports:
+      - "127.0.0.1:${PORT:-3002}:3002"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    mem_limit: 1800m
+    cpus: 1.5
+    networks: [backend]
+
+  playwright-service:
+    image: ghcr.io/firecrawl/playwright-service:${FIRECRAWL_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      BLOCK_MEDIA: "true"
+      MAX_CONCURRENT_PAGES: ${BROWSER_POOL_SIZE:-2}
+    shm_size: 1gb
+    mem_limit: 2g
+    cpus: 1.5
+    networks: [backend]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--bind", "0.0.0.0", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    mem_limit: 512m
+    networks: [backend]
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 15s
+      timeout: 30s
+      retries: 20
+      start_period: 120s
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    mem_limit: 1g
+    networks: [backend]
+
+  nuq-postgres:
+    image: ghcr.io/firecrawl/nuq-postgres:${FIRECRAWL_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    command: ["postgres", "-c", "cron.database_name=${POSTGRES_DB}"]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    mem_limit: 1g
+    networks: [backend]
+
+  searxng:
+    profiles: ["container-searxng"]
+    image: searxng/searxng:latest
+    restart: unless-stopped
+    environment:
+      SEARXNG_BASE_URL: http://localhost:8080/
+      SEARXNG_SECRET: ${SEARXNG_SECRET}
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./searxng/settings.container.yml:/etc/searxng/settings.yml:ro
+      - searxng-cache:/var/cache/searxng
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null 'http://127.0.0.1:8080/'"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    mem_limit: 1g
+    networks: [backend]
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  rabbitmq-data:
+  redis-data:
+  searxng-cache:

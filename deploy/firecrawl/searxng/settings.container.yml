@@ -1,0 +1,60 @@
+use_default_settings: true
+
+general:
+  instance_name: "iSite Firecrawl Search"
+  debug: false
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  default_lang: "zh-CN"
+  formats: [html, json]
+
+server:
+  bind_address: "0.0.0.0"
+  port: 8080
+  secret_key: "replace-in-private-settings-or-via-SEARXNG_SECRET"
+  limiter: false
+  image_proxy: false
+
+outgoing:
+  request_timeout: 8.0
+  max_request_timeout: 12.0
+  pool_connections: 100
+  pool_maxsize: 50
+
+engines:
+  - name: dogpile
+    disabled: true
+  - name: naver
+    disabled: true
+  - name: 360search
+    disabled: false
+  - name: baidu
+    disabled: true
+  - name: bing
+    disabled: true
+  - name: sogou
+    disabled: false
+  - name: quark
+    disabled: false
+  - name: brave
+    disabled: true
+  - name: duckduckgo
+    disabled: true
+  - name: duckduckgo web
+    disabled: false
+  - name: startpage
+    disabled: true
+  - name: qwant
+    disabled: true
+  - name: mojeek
+    disabled: true
+  - name: wikipedia
+    disabled: true
+  - name: wikidata
+    disabled: true
+  - name: google
+    disabled: true
+  - name: yandex
+    disabled: false

@@ -1,0 +1,81 @@
+#!/bin/sh
+set -eu
+
+state_dir=/var/lib/isite2-disk-guard
+log_file=/var/log/isite2-disk-guard.log
+block_file="$state_dir/block-heavy-jobs"
+paused_file="$state_dir/paused-containers"
+sample_file="$state_dir/last-sample"
+
+mkdir -p "$state_dir" /run/lock
+exec 9>/run/lock/isite2-disk-guard.lock
+flock -n 9 || exit 0
+
+timestamp=$(date -u +%FT%TZ)
+usage=$(df -P / | awk 'NR == 2 {gsub("%", "", $5); print $5}')
+used_kb=$(df -Pk / | awk 'NR == 2 {print $3}')
+now_epoch=$(date +%s)
+
+log_event() {
+  printf '%s usage=%s%% %s\n' "$timestamp" "$usage" "$*" >> "$log_file"
+  logger -t isite2-disk-guard "usage=${usage}% $*"
+}
+
+if [ -f "$sample_file" ]; then
+  read -r previous_epoch previous_used_kb < "$sample_file" || true
+  elapsed=$((now_epoch - ${previous_epoch:-now_epoch}))
+  growth_kb=$((used_kb - ${previous_used_kb:-used_kb}))
+  if [ "$elapsed" -gt 0 ] && [ "$growth_kb" -gt 0 ]; then
+    hourly_growth_kb=$((growth_kb * 3600 / elapsed))
+    if [ "$hourly_growth_kb" -ge 2097152 ]; then
+      log_event "rapid_growth_kb_per_hour=$hourly_growth_kb"
+    fi
+  fi
+fi
+printf '%s %s\n' "$now_epoch" "$used_kb" > "$sample_file"
+
+if [ "$usage" -ge 80 ]; then
+  log_event "safe_cleanup_started"
+  journalctl --vacuum-size=300M >/dev/null 2>&1 || true
+  apt-get clean >/dev/null 2>&1 || true
+  docker builder prune -af --filter until=24h >/dev/null 2>&1 || true
+  log_event "safe_cleanup_finished"
+fi
+
+if [ "$usage" -ge 85 ]; then
+  : > "$block_file"
+  log_event "heavy_jobs_blocked"
+elif [ "$usage" -lt 78 ]; then
+  rm -f "$block_file"
+fi
+
+pause_container() {
+  container=$1
+  if [ "$(docker inspect -f '{{.State.Running}}' "$container" 2>/dev/null || true)" = true ]; then
+    docker stop --time 30 "$container" >/dev/null
+    printf '%s\n' "$container" >> "$paused_file"
+    log_event "container_paused=$container"
+  fi
+}
+
+if [ "$usage" -ge 88 ]; then
+  touch "$paused_file"
+  pause_container isite-c-discovery-worker
+  pause_container isite-c-qa-worker
+  pause_container isite-firecrawl-api
+  pause_container isite-firecrawl-playwright-service-1
+fi
+
+if [ "$usage" -ge 92 ]; then
+  pause_container isite-c-worker
+  pause_container isite-firecrawl-searxng-1
+fi
+
+if [ "$usage" -lt 78 ] && [ -s "$paused_file" ]; then
+  sort -u "$paused_file" | while IFS= read -r container; do
+    [ -n "$container" ] || continue
+    docker start "$container" >/dev/null 2>&1 || true
+    log_event "container_resumed=$container"
+  done
+  rm -f "$paused_file"
+fi

@@ -4,6 +4,8 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from isite2.domain.models import ScanRun, ScanRunResult, ScanScope
+from isite2.property_search import rank_property_search_rows
+from isite2.public_reports import country_export_state_hash
 
 
 class InMemoryScanRunRepository:
@@ -60,6 +62,51 @@ class InMemoryScanRunRepository:
                 return packet
         return None
 
+    def search_properties(self, query: str, *, limit: int) -> list[dict[str, Any]]:
+        packets = [
+            packet
+            for packet in self.list_properties()
+            if packet.visibility.main_table_ready
+        ]
+        return rank_property_search_rows(
+            [
+                {
+                    "property_id": str(packet.entity.property_id),
+                    "property_name": packet.entity.property_name,
+                    "aliases": list(packet.entity.aliases),
+                    "country": packet.entity.country,
+                    "city": packet.entity.city,
+                    "city_id": (
+                        packet.entity.city_assignment.city_id
+                        if packet.entity.city_assignment is not None
+                        else None
+                    ),
+                    "scene_type": packet.entity.scene_type,
+                }
+                for packet in packets
+            ],
+            query,
+            limit=limit,
+        )
+
+    def country_export_state_hash(self, country: str, *, public: bool = False) -> str:
+        latest: dict[str, tuple[str, Any]] = {}
+        for result in self.list():
+            for packet in result.packets:
+                if packet.entity.country != country:
+                    continue
+                latest[str(packet.entity.property_id)] = (str(result.scan_run.run_id), packet)
+        return country_export_state_hash(
+            [
+                {
+                    "property_id": property_id,
+                    "scan_run_id": scan_run_id,
+                    "export_ready": packet.visibility.export_ready,
+                }
+                for property_id, (scan_run_id, packet) in latest.items()
+            ]
+        )
+
     def clear(self) -> None:
         self._runs.clear()
         self._artifacts.clear()
@@ -69,12 +116,14 @@ class InMemoryScanRunRepository:
         scan_run_id: UUID,
         artifact_type: str,
         path: str,
+        filter_snapshot: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         artifact = {
             "artifact_id": str(uuid4()),
             "scan_run_id": str(scan_run_id),
             "artifact_type": artifact_type,
             "path": path,
+            "filter_snapshot": filter_snapshot or {},
         }
         self._artifacts.setdefault(scan_run_id, []).append(artifact)
         return artifact

@@ -21,6 +21,7 @@ from isite2.domain.enums import (
 )
 from isite2.domain.models import (
     BuildStatus,
+    CityAssignment,
     Conclusion,
     EvidenceItem,
     InferenceRecord,
@@ -33,9 +34,11 @@ from isite2.domain.models import (
     SceneModelResult,
     SitePacket,
 )
+from isite2.growth.city_normalization import canonicalize_city
 from isite2.repositories.interfaces import ScanRunRepository
 from isite2.rules.candidate_quality import (
     apply_candidate_quality,
+    apply_designated_lead_primary_metric_exception,
     candidate_quality_review_item,
     normalize_text,
 )
@@ -43,6 +46,7 @@ from isite2.rules.config_loader import get_scene_rule, load_source_registry, sce
 from isite2.rules.coordinates import CoordinateResolver
 from isite2.rules.demand import calculate_demand, demand_params_from_scene_rule
 from isite2.rules.gates import GateResult, run_all_gates
+from isite2.rules.metric_safety import safe_annual_visit_estimate
 from isite2.rules.reason import make_google_maps_link, short_reason
 from isite2.rules.validation import is_concrete_review_action
 
@@ -64,6 +68,7 @@ class FakeCandidate:
     longitude: float
     annual_visits: float | None
     main_metric_text: str
+    aliases: list[str] = field(default_factory=list)
     evidence_source_name: str = "MVP Fake Public Evidence Fixture"
     evidence_source_url: str = "https://example.com/isite2-mvp-evidence"
     evidence_source_date: str = "2026"
@@ -76,6 +81,9 @@ class FakeCandidate:
     evidence_items: list[dict[str, Any]] = field(default_factory=list)
     coordinate_review_item: ReviewItem | None = None
     hero_image: dict[str, Any] | None = None
+    allow_missing_primary_metric: bool = False
+    designation_source: str | None = None
+    city_assignment: dict[str, Any] | None = None
 
 
 BUILD_STATUS_INDICATORS = {
@@ -105,14 +113,46 @@ DEFAULT_METRIC_TOKENS = {
 }
 
 
-def run_quality_pipeline(packet: SitePacket) -> PipelineResult:
+def run_quality_pipeline(
+    packet: SitePacket,
+    *,
+    allow_missing_primary_metric: bool = False,
+    designation_source: str | None = None,
+) -> PipelineResult:
     """Run deterministic quality checks for a completed site packet."""
     candidate_quality = apply_candidate_quality(packet)
+    if allow_missing_primary_metric:
+        candidate_quality = apply_designated_lead_primary_metric_exception(
+            packet,
+            candidate_quality,
+        )
     gates = run_all_gates(packet)
     review_items: list[ReviewItem] = list(packet.review_queue)
     quality_review = candidate_quality_review_item(packet, candidate_quality)
     if quality_review is not None:
         review_items.append(quality_review)
+    if candidate_quality.status == "review_required" and allow_missing_primary_metric:
+        review_items.append(
+            ReviewItem(
+                reason=(
+                    "用户指定线索已确认实体，但场景一级量化主指标仍缺失；"
+                    "该例外不代表高价值证据已验证。"
+                ),
+                next_action=(
+                    f"补查 {packet.entity.property_name} 的官方/运营方资料，提取当前场景的"
+                    "一级量化主指标、统计周期、来源链接和发布日期。"
+                ),
+                review_type="designated_lead_primary_metric",
+                severity="high",
+                gate_name="primary_metric_evidence_gate",
+                field_path="scene.primary_value_indicators",
+                source_url=designation_source,
+                suggested_query=(
+                    f"{packet.entity.property_name} {packet.entity.city} "
+                    f"{packet.entity.scene_type} official capacity area rooms"
+                ),
+            )
+        )
     for gate in gates:
         if not gate.passed:
             if gate.gate_name == "candidate_quality_gate":
@@ -217,10 +257,26 @@ def _fake_discovery(
 def _packet_from_candidate(candidate: FakeCandidate) -> SitePacket:
     scene_rule = get_scene_rule(candidate.scene_type)
     scene_form = SceneForm(scene_rule["scene_form"])
+    city_assignment = (
+        CityAssignment.model_validate(candidate.city_assignment)
+        if candidate.city_assignment
+        else canonicalize_city(
+            country=candidate.country,
+            source_city=candidate.city,
+            latitude=candidate.latitude,
+            longitude=candidate.longitude,
+        )
+    )
+    canonical_city = (
+        city_assignment.canonical_city
+        if city_assignment.mapping_status == "verified"
+        else candidate.city
+    )
     property_entity = PropertyEntity(
         country=candidate.country,
-        city=candidate.city,
+        city=canonical_city,
         property_name=candidate.property_name,
+        aliases=candidate.aliases,
         scene_type=candidate.scene_type,
         scene_form=scene_form,
         latitude=candidate.latitude,
@@ -232,7 +288,7 @@ def _packet_from_candidate(candidate: FakeCandidate) -> SitePacket:
             candidate.latitude,
             candidate.longitude,
             property_name=candidate.property_name,
-            city=candidate.city,
+            city=canonical_city,
             country=candidate.country,
         ),
         coordinate_status=candidate.coordinate_status,
@@ -241,50 +297,64 @@ def _packet_from_candidate(candidate: FakeCandidate) -> SitePacket:
             if candidate.hero_image
             else None
         ),
+        city_assignment=city_assignment,
     )
 
     evidence = _evidence_from_candidate(candidate, property_entity.property_id, scene_rule)
     proxy_basis = scene_rule["proxy_basis"][1]
+    safe_annual_visits = safe_annual_visit_estimate(candidate.annual_visits)
     scene = SceneModelResult(
         area_metric_name=scene_rule["area_metric"],
         area_metric_status="Proxy",
         primary_value_indicators=scene_rule["primary_indicators"],
         proxy_basis=proxy_basis,
         proxy_level=ProxyLevel.P1_STRONG,
-        annual_visits_est=candidate.annual_visits,
+        annual_visits_est=safe_annual_visits,
         assumption_note=(
             None
-            if candidate.annual_visits is not None
+            if safe_annual_visits is not None
             else "annual_visits missing; field left unset."
         ),
     )
     build_status = _build_status_from_evidence(evidence)
-    demand = calculate_demand(candidate.annual_visits, demand_params_from_scene_rule(scene_rule))
+    demand = calculate_demand(safe_annual_visits, demand_params_from_scene_rule(scene_rule))
     solution = RecommendedSolution(scene_rule["default_solution"])
     inference = []
-    if candidate.annual_visits is not None and candidate.annual_visits > 0:
+    if safe_annual_visits is not None and safe_annual_visits > 0:
         inference.append(
             InferenceRecord(
                 inferred_field="annual_visits_est",
-                inferred_value=str(int(candidate.annual_visits)),
+                inferred_value=str(int(safe_annual_visits)),
                 inference_basis=proxy_basis,
                 inference_chain=(
                     f"Observed: {candidate.main_metric_text} -> {proxy_basis} -> "
-                    f"annual_visits_est={int(candidate.annual_visits)}"
+                    f"annual_visits_est={int(safe_annual_visits)}"
                 ),
                 inference_confidence="Conservative",
             )
         )
     conclusion = Conclusion(
-        evidence_status=EvidenceStatus.SUPPORTED,
-        value_class=ValueClass.CITY_CORE,
+        evidence_status=(
+            EvidenceStatus.INSUFFICIENT
+            if candidate.allow_missing_primary_metric
+            else EvidenceStatus.SUPPORTED
+        ),
+        value_class=(
+            ValueClass.OBSERVATION
+            if candidate.allow_missing_primary_metric
+            else ValueClass.CITY_CORE
+        ),
         action_class=ActionClass.SURVEY_FIRST,
         recommended_solution=solution,
-        reason_to_recommend=short_reason(
-            candidate.scene_type,
-            candidate.main_metric_text,
-            solution.value,
-            inference_used=bool(inference),
+        reason_to_recommend=(
+            "用户指定价值楼宇线索；实体和位置已核验，主指标量化证据缺失，需优先补证。"
+            if candidate.allow_missing_primary_metric
+            else short_reason(
+                candidate.scene_type,
+                candidate.main_metric_text,
+                solution.value,
+                inference_used=bool(inference),
+            )
         ),
         risk_review_reason="室分建设状态无公开证据，现网状态链独立进入核验。",
         next_action="补查运营商室分公告、业主网络升级公告，并核验 Google Maps 坐标。",
@@ -307,7 +377,11 @@ def _packet_from_candidate(candidate: FakeCandidate) -> SitePacket:
         conclusion=conclusion,
         review_queue=review_queue,
     )
-    quality = run_quality_pipeline(packet)
+    quality = run_quality_pipeline(
+        packet,
+        allow_missing_primary_metric=candidate.allow_missing_primary_metric,
+        designation_source=candidate.designation_source,
+    )
     packet.review_queue = quality.review_items
     return packet
 
@@ -432,6 +506,7 @@ def _registry_candidates(
                 country=country,
                 city=row["city"],
                 property_name=row["property_name"],
+                aliases=list(row.get("aliases") or []),
                 scene_type=row["scene_type"],
                 latitude=coordinate.latitude,
                 longitude=coordinate.longitude,
@@ -445,6 +520,16 @@ def _registry_candidates(
                 evidence_items=evidence_items,
                 coordinate_review_item=coordinate.review_item,
                 hero_image=row.get("hero_image"),
+                allow_missing_primary_metric=bool(
+                    row.get("designated_lead")
+                    and row.get("primary_metric_status") == "missing"
+                ),
+                designation_source=row.get("designation_source"),
+                city_assignment=(
+                    dict(row["city_assignment"])
+                    if isinstance(row.get("city_assignment"), dict)
+                    else None
+                ),
             )
         )
     return [
@@ -489,17 +574,48 @@ def _observed_annual_visits(row: dict[str, Any]) -> float | None:
 
 def _numeric_metric_value(value: str | None) -> float | None:
     text = str(value or "")
-    numbers = [
-        float(match.replace(",", ""))
-        for match in re.findall(r"\d[\d,.]*", text)
-        if match
-    ]
+    numbers = []
+    lower = text.casefold()
+    for match in re.finditer(r"\d[\d,.]*", text):
+        raw = match.group(0)
+        suffix = lower[match.end() : match.end() + 24]
+        parsed = _parse_metric_number(
+            raw,
+            scaled_suffix=("billion" in suffix or "million" in suffix),
+        )
+        if parsed is None:
+            continue
+        if safe_annual_visit_estimate(parsed) is None:
+            continue
+        if "billion" in suffix:
+            parsed *= 1_000_000_000
+        elif "million" in suffix:
+            parsed *= 1_000_000
+        numbers.append(parsed)
     if not numbers:
         return None
-    metric_value = max(numbers)
-    if "million" in text.casefold() and metric_value < 1000:
-        metric_value *= 1_000_000
-    return metric_value
+    return max(numbers)
+
+
+def _parse_metric_number(value: str, *, scaled_suffix: bool = False) -> float | None:
+    normalized = value.replace(" ", "")
+    if (
+        scaled_suffix
+        and "," not in normalized
+        and re.fullmatch(r"\d{1,3}\.\d{1,3}", normalized)
+    ):
+        try:
+            return float(normalized)
+        except ValueError:
+            return None
+    if re.fullmatch(r"\d{1,3}(?:\.\d{3})+", normalized):
+        normalized = normalized.replace(".", "")
+    if re.fullmatch(r"\d{1,3}(?:,\d{3})+(?:\.\d+)?", normalized):
+        normalized = normalized.replace(",", "")
+    try:
+        return float(normalized.replace(",", ""))
+    except ValueError:
+        return None
 
 
 def _main_metric_text(scene_type: str, index: int) -> str:
@@ -514,5 +630,6 @@ def _main_metric_text(scene_type: str, index: int) -> str:
         "university": f"在校人数：{30_000 + index * 1000:,}人",
         "transport_hub": f"日均客流：{120_000 + index * 1000:,}人次",
         "cruise_port": f"年客流：{1_000_000 + index * 100_000:,}人次（2026）",
+        "mosque": f"清真寺面积：{25_000 + index * 1000:,}㎡",
     }
     return values.get(scene_type, f"主指标：MVP fixture {index}")

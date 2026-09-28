@@ -9,7 +9,7 @@ import subprocess
 import time
 from collections import Counter, defaultdict
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
@@ -30,12 +30,13 @@ DB_URL = f"sqlite+pysqlite:///{DB_PATH}"
 OUTPUT_DIR = Path("outputs") / "regional_scan_loop"
 CACHE_DIR = OUTPUT_DIR / "public_structured_growth_cache"
 SOURCE_TYPE = "public_structured_growth_pass"
-TODAY = "2026-05-12"
+TODAY = date.today().isoformat()
 USER_AGENT = "isite2-codex/0.1 public evidence research"
 SPARQL_MAX_TIME_SECONDS = 45
 
 COUNTRY_QIDS = {
     "Algeria": "Q262",
+    "Angola": "Q916",
     "Argentina": "Q414",
     "Bahamas": "Q778",
     "Barbados": "Q244",
@@ -46,19 +47,39 @@ COUNTRY_QIDS = {
     "Burkina Faso": "Q965",
     "Cameroon": "Q1009",
     "Central African Republic": "Q929",
+    "Chad": "Q657",
     "Chile": "Q298",
     "Colombia": "Q739",
     "Comoros": "Q970",
+    "Congo": "Q971",
     "Cote d'Ivoire": "Q1008",
+    "Czech Republic": "Q213",
+    "Democratic Republic of the Congo": "Q974",
     "Djibouti": "Q977",
     "Ecuador": "Q736",
     "Egypt": "Q79",
+    "Equatorial Guinea": "Q983",
+    "Eritrea": "Q986",
     "Gabon": "Q1000",
+    "Gambia": "Q1005",
+    "France": "Q142",
+    "Germany": "Q183",
     "Ghana": "Q117",
+    "Greece": "Q41",
+    "Guinea": "Q1006",
+    "Guinea-Bissau": "Q1007",
+    "Eswatini": "Q1050",
+    "Zimbabwe": "Q954",
+    "Reunion": "Q17070",
+    "Somalia": "Q1045",
     "Kenya": "Q114",
+    "Lesotho": "Q1013",
     "Liberia": "Q1014",
     "Libya": "Q1016",
+    "Madagascar": "Q1019",
     "Malawi": "Q1020",
+    "Mali": "Q912",
+    "Mauritania": "Q1025",
     "Mauritius": "Q1027",
     "Mexico": "Q96",
     "Morocco": "Q1028",
@@ -72,8 +93,11 @@ COUNTRY_QIDS = {
     "Sao Tome and Principe": "Q1039",
     "Sierra Leone": "Q1044",
     "South Africa": "Q258",
+    "South Sudan": "Q958",
     "Suriname": "Q730",
     "Tanzania": "Q924",
+    "Thailand": "Q869",
+    "Togo": "Q945",
     "Zambia": "Q953",
     "Sri Lanka": "Q854",
     "Cambodia": "Q424",
@@ -81,6 +105,45 @@ COUNTRY_QIDS = {
     "Turkey": "Q43",
     "Philippines": "Q928",
     "Saudi Arabia": "Q851",
+    "Vietnam": "Q881",
+    "Indonesia": "Q252",
+    "Tunisia": "Q948",
+    "Uganda": "Q1036",
+    "Slovakia": "Q214",
+    "Moldova": "Q217",
+    "Cyprus": "Q229",
+    "Albania": "Q222",
+    "North Macedonia": "Q221",
+    "Bulgaria": "Q219",
+    "Croatia": "Q224",
+    "Slovenia": "Q215",
+    "Bosnia and Herzegovina": "Q225",
+    "Serbia": "Q403",
+    "Montenegro": "Q236",
+    "Nicaragua": "Q811",
+    "Venezuela": "Q717",
+    "Haiti": "Q790",
+    "Uruguay": "Q77",
+    "Papua New Guinea": "Q691",
+    "Solomon Islands": "Q685",
+    "Fiji": "Q712",
+    "Nepal": "Q837",
+    "Laos": "Q819",
+    "Brunei": "Q921",
+    "Afghanistan": "Q889",
+    "Yemen": "Q805",
+    "Lebanon": "Q822",
+    "Bahrain": "Q398",
+    "Kazakhstan": "Q232",
+    "Pakistan": "Q843",
+    "Uzbekistan": "Q265",
+    "Georgia": "Q230",
+    "Azerbaijan": "Q227",
+    "Kyrgyzstan": "Q813",
+    "Mongolia": "Q711",
+    "Tajikistan": "Q863",
+    "Turkmenistan": "Q874",
+    "Armenia": "Q399",
 }
 
 HOTEL_ALLOW = re.compile(
@@ -133,7 +196,14 @@ def main() -> None:
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
     countries = args.countries or _active_countries()
+    unsupported_countries = [country for country in countries if country not in COUNTRY_QIDS]
+    if args.countries and unsupported_countries:
+        raise SystemExit(
+            "Unsupported explicit countries: " + ", ".join(sorted(unsupported_countries))
+        )
     countries = [country for country in countries if country in COUNTRY_QIDS]
+    if not countries:
+        raise SystemExit("No supported countries selected; refusing to run global curation or sync.")
     registry = load_effective_source_registry()
     store = EvidenceCurationStore(database_url=DB_URL)
     known_index = known_opportunity_index_from_registry(
@@ -239,10 +309,16 @@ def main() -> None:
 def _query_airport_patronage(countries: list[str]) -> list[dict]:
     values = _country_values(countries)
     query = f"""
-SELECT ?countryName ?item ?itemLabel ?coord ?image ?article ?patronage WHERE {{
+SELECT ?countryName ?item ?itemLabel ?coord ?image ?article ?servedCityLabel ?adminAreaLabel ?patronage WHERE {{
   VALUES (?country ?countryName) {{ {values} }}
   ?item wdt:P17 ?country; wdt:P31/wdt:P279* wd:Q1248784; wdt:P625 ?coord; wdt:P3872 ?patronage.
   OPTIONAL {{ ?item wdt:P18 ?image. }}
+  OPTIONAL {{
+    ?item wdt:P931 ?servedCity.
+    ?servedCity wdt:P17 ?country;
+      wdt:P31/wdt:P279* wd:Q515.
+  }}
+  OPTIONAL {{ ?item wdt:P131 ?adminArea. }}
   OPTIONAL {{ ?article schema:about ?item; schema:isPartOf <https://en.wikipedia.org/>. }}
   SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en,pt,es,fr". }}
 }}
@@ -637,6 +713,8 @@ def _row(kind: str, raw: dict) -> dict:
         "coord": _value(raw, "coord") or "",
         "image": _https(_value(raw, "image")),
         "article": _value(raw, "article"),
+        "served_city": _clean_label(_value(raw, "servedCityLabel") or ""),
+        "admin_area": _clean_label(_value(raw, "adminAreaLabel") or ""),
         "patronage": _value(raw, "patronage"),
         "area": _value(raw, "area"),
         "rooms": _value(raw, "rooms"),
@@ -780,7 +858,10 @@ def _is_brazil_restricted_city(label: str) -> bool:
 def _city(row: dict, country: str) -> str:
     article = row.get("article") or ""
     label = row.get("label") or ""
-    text = f"{article} {label}"
+    served_city = _explicit_served_city(row.get("served_city"))
+    if served_city and not _is_known_city_mismatch(country, label, served_city):
+        return served_city
+    text = f"{article} {label} {row.get('admin_area') or ''}"
     for token in [
         "São Paulo",
         "Rio de Janeiro",
@@ -801,12 +882,150 @@ def _city(row: dict, country: str) -> str:
         "Medellín",
         "Salvador",
         "Durban",
+        "Malabo",
+        "Bata",
+        "Bissau",
+        "Mbabane",
+        "Manzini",
+        "Harare",
+        "Bulawayo",
+        "Saint-Denis",
+        "Saint Denis",
+        "Mogadishu",
+        "Hargeisa",
+        "Bratislava",
+        "Košice",
+        "Kosice",
+        "Chișinău",
+        "Chisinau",
+        "Tiraspol",
+        "Nicosia",
+        "Limassol",
+        "Tirana",
+        "Durrës",
+        "Durres",
+        "Skopje",
+        "Bitola",
+        "Sofia",
+        "Plovdiv",
+        "Zagreb",
+        "Split",
+        "Ljubljana",
+        "Maribor",
+        "Sarajevo",
+        "Banja Luka",
+        "Belgrade",
+        "Novi Sad",
+        "Podgorica",
+        "Nikšić",
+        "Niksic",
+        "Managua",
+        "León",
+        "Leon",
+        "Caracas",
+        "Maracaibo",
+        "Port-au-Prince",
+        "Cap-Haïtien",
+        "Cap-Haitien",
+        "Montevideo",
+        "Punta del Este",
+        "Port Moresby",
+        "Lae",
+        "Honiara",
+        "Suva",
+        "Nadi",
+        "Kathmandu",
+        "Pokhara",
+        "Vientiane",
+        "Luang Prabang",
+        "Bandar Seri Begawan",
+        "Kabul",
+        "Herat",
+        "Sana'a",
+        "Sanaa",
+        "Aden",
+        "Beirut",
+        "Manama",
+        "Tbilisi",
+        "Batumi",
+        "Baku",
+        "Ganja",
+        "Bishkek",
+        "Osh",
+        "Ulaanbaatar",
+        "Darkhan",
+        "Dushanbe",
+        "Khujand",
+        "Ashgabat",
+        "Yerevan",
+        "Gyumri",
+        "Bangkok",
+        "Pak Kret",
+        "Nonthaburi",
+        "Bang Phli",
+        "Samut Prakan",
+        "Pattaya",
+        "Chiang Mai",
+        "Phuket",
+        "Phuket City",
+        "Patong",
+        "Khon Kaen",
+        "Nakhon Ratchasima",
+        "Hat Yai",
+        "Udon Thani",
+        "Rayong",
+        "Surat Thani",
+        "Ko Samui",
+        "Hua Hin",
     ]:
         if country != "Brazil" and _is_brazil_restricted_city(token):
             continue
         if token in text or token.replace(" ", "_") in article:
             return token
     return ""
+
+
+_KNOWN_CITY_MISMATCHES = {
+    ("Bahrain", "Bahrain International Airport", "Riffa"),
+    ("Mongolia", "Buyant-Ukhaa International Airport", "Nalaikh"),
+}
+
+
+def _is_known_city_mismatch(country: str, property_name: str, city: str) -> bool:
+    normalized = (
+        country,
+        _clean_label(property_name),
+        _clean_label(city),
+    )
+    return normalized in _KNOWN_CITY_MISMATCHES
+
+
+_ADMIN_AREA_TOKENS = {
+    "administrative",
+    "area",
+    "canton",
+    "county",
+    "department",
+    "district",
+    "governorate",
+    "municipality",
+    "oblast",
+    "province",
+    "region",
+    "state",
+}
+
+
+def _explicit_served_city(label: str | None) -> str:
+    text = _clean_label(label or "")
+    if not text:
+        return ""
+    normalized = text.casefold()
+    if any(token in normalized.split() for token in _ADMIN_AREA_TOKENS):
+        return ""
+    if len(text) > 60:
+        return ""
+    return text
 
 
 def _hero(label: str, source_url: str, image_url: str) -> dict[str, str]:

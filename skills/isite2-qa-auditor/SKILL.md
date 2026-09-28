@@ -15,6 +15,8 @@ it traces to evidence, source, date, evidence tier, and inference chain.
 
 ## Operating Rules
 
+- Before every QA run, read `docs/15_qa_lessons_learned.md` and carry its quick checklist into the audit.
+- If a new issue is found, append it to `docs/15_qa_lessons_learned.md` with symptom, root cause, guardrail, and the next QA check before finalizing the report.
 - Discuss the QA scope and Firecrawl budget with the user before execution.
 - Prefer existing project scripts and reports; do not add new scripts unless a
   repeated check cannot be covered by existing code or SQL.
@@ -28,6 +30,12 @@ it traces to evidence, source, date, evidence tier, and inference chain.
   verify or fetch.
 
 ## Standard QA Flow
+
+0. **Read lessons learned**
+   - Read `docs/15_qa_lessons_learned.md`.
+   - Select the relevant checks for the current scope: evidence metrics,
+     numeric parsing, recommendation consistency, image validity, Firecrawl
+     retention, dedupe, active sync, OAuth provider, and delivery logs.
 
 1. **Inventory reports**
    - List `outputs/qa/*`.
@@ -124,7 +132,7 @@ asks.
 
 - Any `example.com`, fixture, default, fallback, or unknown source in active.
 - City equals country or city clearly belongs to a different country.
-- Candidate has no real image but appears in active.
+- Candidate has a broken, non-property, or hotlinked image in active/export.
 - Airport role evidence used as main metric.
 - Residential tower admitted as office/government.
 - Hotel ranked only by rooms without brand/star/luxury/MICE evidence.

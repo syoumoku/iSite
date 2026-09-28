@@ -1,10 +1,14 @@
 import json
 from dataclasses import replace
 
-from isite2.growth.evidence_curation import run_pending_evidence_curation
-from isite2.growth.evidence_intake import CandidateDraft, load_registry_overlay
-from isite2.growth.evidence_store import EvidenceCurationStore
 from isite2.db.models import RawEvidenceItemDB
+from isite2.growth.evidence_curation import run_pending_evidence_curation
+from isite2.growth.evidence_intake import (
+    CandidateDraft,
+    load_registry_overlay,
+    merge_source_registries,
+)
+from isite2.growth.evidence_store import EvidenceCurationStore
 
 
 def test_new_url_raw_evidence_triggers_curation(tmp_path) -> None:
@@ -90,6 +94,44 @@ def test_raw_evidence_curation_adds_default_hero_alt_text(tmp_path) -> None:
     overlay = load_registry_overlay(overlay_path)
     candidate = overlay["countries"]["Nigeria"]["candidates"][0]
     assert candidate["hero_image"]["alt_text"] == "Test Evidence Mall public image"
+
+
+def test_overlay_merge_overrides_base_candidate_hero_image() -> None:
+    base = {
+        "countries": {
+            "Nigeria": {
+                "candidates": [
+                    {
+                        "property_name": "Test Evidence Mall",
+                        "city": "Lagos",
+                        "scene_type": "mall_mixed_use",
+                        "hero_image": {"url": "https://example.org/old.jpg"},
+                        "evidence": [],
+                    }
+                ]
+            }
+        }
+    }
+    overlay = {
+        "countries": {
+            "Nigeria": {
+                "candidates": [
+                    {
+                        "property_name": "Test Evidence Mall",
+                        "city": "Lagos",
+                        "scene_type": "mall_mixed_use",
+                        "hero_image": {"url": "https://example.org/new.jpg"},
+                        "evidence": [],
+                    }
+                ]
+            }
+        }
+    }
+
+    merged = merge_source_registries(base, overlay)
+
+    candidate = merged["countries"]["Nigeria"]["candidates"][0]
+    assert candidate["hero_image"]["url"] == "https://example.org/new.jpg"
 
 
 def test_duplicate_url_with_unchanged_hash_does_not_trigger_second_curation(tmp_path) -> None:
@@ -199,7 +241,10 @@ def test_existing_url_with_changed_value_replaces_overlay_evidence(tmp_path) -> 
     assert second is not None
     assert second.updated_count == 1
     assert len(evidence) == 1
-    assert evidence[0]["field_value"] == "Annual public footfall is now verified as 2,500,000 visitors."
+    assert (
+        evidence[0]["field_value"]
+        == "Annual public footfall is now verified as 2,500,000 visitors."
+    )
 
 
 def test_identity_variant_updates_existing_candidate_without_new_overlay_row(tmp_path) -> None:

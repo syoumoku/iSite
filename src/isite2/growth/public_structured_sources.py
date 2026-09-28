@@ -47,6 +47,16 @@ HARD_PRIMARY: dict[str, list[str]] = {
     "university": ["enrollment", "students", "student_count", "campus_population"],
     "transport_hub": ["daily_ridership", "ridership", "interchange_volume", "line_count"],
     "cruise_port": ["passenger_throughput", "annual_passenger_throughput"],
+    "mosque": [
+        "mosque_area",
+        "gross_floor_area",
+        "prayer_hall_area",
+        "annual_visitors",
+        "annual_visits",
+        "daily_visitors",
+        "annual_footfall",
+        "footfall",
+    ],
 }
 
 INFOBOX_KEY_HINTS: dict[str, dict[str, list[str]]] = {
@@ -90,6 +100,13 @@ INFOBOX_KEY_HINTS: dict[str, dict[str, list[str]]] = {
     "university": {
         "enrollment": ["students", "enrollment"],
         "students": ["students", "enrollment"],
+    },
+    "mosque": {
+        "mosque_area": ["area", "floor_area", "building_area"],
+        "gross_floor_area": ["gross_floor_area", "floor_area", "area"],
+        "prayer_hall_area": ["prayer", "prayer_hall"],
+        "annual_visitors": ["visitors", "annual_visitors", "visitor"],
+        "daily_visitors": ["daily_visitors", "visitors"],
     },
 }
 
@@ -293,7 +310,7 @@ class MediaWikiAdapter:
         payload = self.client.get_json(url, timeout=self.timeout)
         for row in payload.get("query", {}).get("search", []) or []:
             title = str(row.get("title") or "")
-            if _name_token_score(target.property_name, title) >= 0.35:
+            if _name_token_score(target.property_name, title) >= 0.6:
                 return title
         return None
 
@@ -702,9 +719,25 @@ def _metric_value_accepted(scene_type: str, field_group: str, field_value: str) 
         "office_nla",
         "exhibition_area",
         "meeting_ballroom_area",
+        "mosque_area",
+        "gross_floor_area",
+        "prayer_hall_area",
+        "site_area",
+        "built_up_area",
     }:
         return value >= 1_000
-    if field_group in {"students", "enrollment", "beds", "daily_ridership", "ridership"}:
+    if field_group in {
+        "students",
+        "enrollment",
+        "beds",
+        "daily_ridership",
+        "ridership",
+        "annual_visitors",
+        "annual_visits",
+        "daily_visitors",
+        "annual_footfall",
+        "footfall",
+    }:
         return value >= 100
     return True
 
@@ -745,9 +778,9 @@ def _clean_wiki_value(value: str) -> str:
 
 
 def _content_matches_target(property_name: str, title: str, content: str) -> bool:
-    if _name_token_score(property_name, title) >= 0.35:
+    if _name_token_score(property_name, title) >= 0.6:
         return True
-    return _name_token_score(property_name, content[:2000]) >= 0.45
+    return _name_token_score(property_name, content[:2000]) >= 0.7
 
 
 def _name_token_score(left: str | None, right: str | None) -> float:

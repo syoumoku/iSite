@@ -17,6 +17,17 @@ from isite2.connectors.models import (
     GeocodeResult,
     SearchResult,
 )
+from isite2.connectors.scrapling import (
+    ScraplingPublicEvidenceProvider,
+    ScraplingProviderUnavailable,
+    ScraplingRestrictedPage,
+)
+from isite2.connectors.web import (
+    PageFetchProvider,
+    SearchManifestProvider,
+    SearchManifestValidationError,
+    SearchProvider,
+)
 
 __all__ = [
     "EvidenceExtractionResult",
@@ -30,6 +41,13 @@ __all__ = [
     "InMemorySourceCache",
     "RateLimiter",
     "RobotsPolicy",
+    "PageFetchProvider",
+    "ScraplingProviderUnavailable",
+    "ScraplingPublicEvidenceProvider",
+    "ScraplingRestrictedPage",
     "SearchResult",
+    "SearchManifestProvider",
+    "SearchManifestValidationError",
+    "SearchProvider",
     "classify_source_tier",
 ]

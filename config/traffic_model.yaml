@@ -1,0 +1,165 @@
+version: traffic.v2.0
+busy_hour_seconds: 3600
+public_ranges: true
+rollout:
+  policy_version: traffic_rollout.v1
+  default_activation_mode: direct_only
+  approved_proxy_scenes:
+    Brazil: []
+metric_bounds:
+  annual_passenger_throughput: [1, 300000000]
+  passenger_throughput: [1, 300000000]
+  annual_footfall: [100, 1000000000]
+  footfall: [100, 1000000000]
+  annual_visitors: [100, 1000000000]
+  annual_visits: [100, 1000000000]
+  daily_ridership: [10, 20000000]
+  ridership: [10, 20000000]
+  daily_visitors: [10, 20000000]
+  outpatient_volume: [10, 500000000]
+  interchange_volume: [10, 500000000]
+  exhibition_area: [100, 1000000]
+  meeting_area: [50, 1000000]
+  peak_event_capacity: [100, 500000]
+  plenary_capacity: [100, 500000]
+  seat_count: [100, 250000]
+  keys: [20, 5000]
+  rooms: [20, 5000]
+  meeting_ballroom_area: [50, 500000]
+  ballroom_capacity: [50, 100000]
+  gla: [1000, 2000000]
+  retail_gfa: [1000, 3000000]
+  office_nla: [1000, 5000000]
+  office_gfa: [1000, 5000000]
+  beds: [20, 10000]
+  staff_count: [20, 100000]
+  employee_count: [20, 100000]
+  enrollment: [100, 1000000]
+  students: [100, 1000000]
+  student_count: [100, 1000000]
+  campus_population: [100, 1000000]
+scenes:
+  airport_terminal:
+    active_days: [365, 365, 365]
+    peak_day_factor: [1.10, 1.25, 1.50]
+    calibrated: true
+    proxy_metrics: {}
+  convention_center:
+    event_driven: true
+    active_days: [35, 70, 120]
+    peak_day_factor: [1.20, 1.50, 2.00]
+    calibrated: false
+    proxy_metrics:
+      exhibition_area:
+        annual_multiplier: [5, 10, 18]
+        peak_multiplier: [0.20, 0.35, 0.55]
+      meeting_area:
+        annual_multiplier: [8, 15, 25]
+        peak_multiplier: [0.15, 0.30, 0.50]
+      peak_event_capacity:
+        annual_multiplier: [6, 10, 18]
+        peak_multiplier: [0.65, 0.85, 1.00]
+      plenary_capacity:
+        annual_multiplier: [6, 10, 18]
+        peak_multiplier: [0.65, 0.85, 1.00]
+  stadium:
+    event_driven: true
+    active_days: [8, 15, 30]
+    peak_day_factor: [1.00, 1.00, 1.00]
+    calibrated: false
+    proxy_metrics:
+      seat_count:
+        annual_multiplier: [8, 15, 30]
+        peak_multiplier: [0.55, 0.75, 0.95]
+      peak_event_capacity:
+        annual_multiplier: [8, 15, 30]
+        peak_multiplier: [0.55, 0.75, 0.95]
+  luxury_hotel_mice:
+    active_days: [330, 350, 365]
+    peak_day_factor: [1.05, 1.20, 1.45]
+    calibrated: false
+    proxy_component_groups:
+      accommodation: [keys, rooms]
+      mice: [meeting_ballroom_area, ballroom_capacity]
+    proxy_metrics:
+      keys:
+        annual_multiplier: [650, 900, 1150]
+        peak_multiplier: [1.20, 1.80, 2.50]
+      rooms:
+        annual_multiplier: [650, 900, 1150]
+        peak_multiplier: [1.20, 1.80, 2.50]
+      meeting_ballroom_area:
+        annual_multiplier: [15, 30, 50]
+        peak_multiplier: [0.20, 0.35, 0.50]
+      ballroom_capacity:
+        annual_multiplier: [80, 120, 180]
+        peak_multiplier: [0.60, 0.85, 1.00]
+  mall_mixed_use:
+    active_days: [350, 360, 365]
+    peak_day_factor: [1.15, 1.35, 1.75]
+    calibrated: false
+    proxy_metrics:
+      gla:
+        annual_multiplier: [12, 20, 32]
+      retail_gfa:
+        annual_multiplier: [10, 18, 28]
+  office_government:
+    active_days: [230, 250, 270]
+    peak_day_factor: [1.00, 1.10, 1.25]
+    calibrated: false
+    proxy_metrics:
+      office_nla:
+        annual_multiplier: [6, 10, 16]
+      office_gfa:
+        annual_multiplier: [5, 9, 14]
+  hospital:
+    active_days: [365, 365, 365]
+    peak_day_factor: [1.05, 1.20, 1.50]
+    calibrated: false
+    direct_visit_covers_total: false
+    proxy_component_groups:
+      outpatient: [outpatient_volume]
+      inpatient_and_visitors: [beds]
+      staff: [staff_count, employee_count]
+    proxy_metrics:
+      outpatient_volume: {}
+      beds:
+        annual_multiplier: [250, 400, 650]
+      staff_count:
+        annual_multiplier: [230, 250, 270]
+      employee_count:
+        annual_multiplier: [230, 250, 270]
+  university:
+    active_days: [160, 180, 210]
+    peak_day_factor: [1.00, 1.10, 1.30]
+    calibrated: false
+    proxy_metrics:
+      enrollment:
+        annual_multiplier: [140, 180, 220]
+      students:
+        annual_multiplier: [140, 180, 220]
+      student_count:
+        annual_multiplier: [140, 180, 220]
+      campus_population:
+        annual_multiplier: [140, 180, 220]
+  transport_hub:
+    active_days: [350, 360, 365]
+    peak_day_factor: [1.05, 1.20, 1.45]
+    calibrated: true
+    proxy_metrics: {}
+  cruise_port:
+    active_days: [120, 220, 365]
+    peak_day_factor: [1.20, 1.60, 2.20]
+    calibrated: true
+    proxy_metrics: {}
+  mosque:
+    active_days: [300, 350, 365]
+    peak_day_factor: [1.50, 2.50, 5.00]
+    calibrated: false
+    proxy_metrics:
+      mosque_area:
+        annual_multiplier: [20, 35, 60]
+      gross_floor_area:
+        annual_multiplier: [15, 30, 50]
+      prayer_hall_area:
+        annual_multiplier: [20, 35, 60]

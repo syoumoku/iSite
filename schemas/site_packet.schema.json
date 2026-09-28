@@ -28,8 +28,34 @@
         "city": {
           "type": "string"
         },
+        "city_assignment": {
+          "type": ["object", "null"],
+          "required": ["source_city", "mapping_status", "mapping_method"],
+          "properties": {
+            "city_id": {"type": ["string", "null"]},
+            "canonical_city": {"type": "string"},
+            "source_city": {"type": "string"},
+            "locality": {"type": ["string", "null"]},
+            "admin_area_1": {"type": ["string", "null"]},
+            "admin_area_2": {"type": ["string", "null"]},
+            "mapping_status": {"enum": ["verified", "review_required", "unmapped"]},
+            "mapping_method": {"type": "string"},
+            "grouping_basis": {"type": ["string", "null"]},
+            "source_authority": {"type": ["string", "null"]},
+            "source_url": {"type": ["string", "null"]},
+            "source_date": {"type": ["string", "null"]},
+            "source_hash": {"type": ["string", "null"]},
+            "mapping_version": {"type": ["string", "null"]}
+          }
+        },
         "property_name": {
           "type": "string"
+        },
+        "aliases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         },
         "scene_type": {
           "type": "string"
@@ -222,6 +248,129 @@
             "number",
             "null"
           ]
+        }
+      }
+    },
+    "traffic_estimate": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "model_version",
+        "estimate_method",
+        "input_hash",
+        "confidence"
+      ],
+      "properties": {
+        "model_version": {
+          "type": "string"
+        },
+        "estimate_method": {
+          "type": "string"
+        },
+        "input_hash": {
+          "type": "string"
+        },
+        "annual_visits_p10": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "annual_visits_p50": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "annual_visits_p90": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "peak_day_visits_p50": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "busy_hour_users_p50": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "busy_hour_traffic_gb_p50": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "busy_hour_bandwidth_mbps_p50": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "confidence": {
+          "type": "string"
+        },
+        "activation_status": {
+          "type": "string"
+        },
+        "activation_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "qa_flags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "network_signals": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "complaints": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "ookla": {
+          "type": "object",
+          "properties": {
+            "mobile": {
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "fixed": {
+              "type": [
+                "object",
+                "null"
+              ]
+            }
+          }
+        },
+        "network_validation_priority": {
+          "type": "string"
+        },
+        "validation_reasons": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     },

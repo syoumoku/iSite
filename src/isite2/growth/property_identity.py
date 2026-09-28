@@ -311,13 +311,15 @@ def build_property_identity(
     longitude: float | None = None,
     source_urls: Iterable[str | None] | None = None,
     aliases: Iterable[str | None] | None = None,
+    city_id: str | None = None,
 ) -> PropertyIdentity:
     normalized_country = normalize_text(country)
     normalized_city = normalize_text(city)
     normalized_scene_type = normalize_text(scene_type)
     normalized_name = normalize_property_name(property_name)
+    city_identity = normalize_text(city_id) if city_id else normalized_city
     identity_key = "|".join(
-        [normalized_country, normalized_scene_type, normalized_city, normalized_name]
+        [normalized_country, normalized_scene_type, city_identity, normalized_name]
     )
     return PropertyIdentity(
         country=country,
@@ -345,12 +347,14 @@ def property_identity_key(
     city: str,
     property_name: str,
     scene_type: str,
+    city_id: str | None = None,
 ) -> str:
     return build_property_identity(
         country=country,
         city=city,
         property_name=property_name,
         scene_type=scene_type,
+        city_id=city_id,
     ).identity_key
 
 

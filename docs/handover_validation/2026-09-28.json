@@ -1,0 +1,149 @@
+{
+  "date": "2026-09-28",
+  "baseline_commit": "3a84d33c71500b85340f4b85268e2dcbe5a2e208",
+  "scope": "Current local implementation and handover documents; no production mutation",
+  "checks": [
+    {
+      "name": "backend_pytest",
+      "result": "passed",
+      "passed": 497,
+      "warnings": 2,
+      "seconds": 820.89,
+      "isolation": "Dedicated default/ops SQLite files; overlay auto sync disabled"
+    },
+    {
+      "name": "frontend_typescript_vite",
+      "result": "passed",
+      "warnings": [
+        "Large chunk advisory"
+      ]
+    },
+    {
+      "name": "playwright_desktop",
+      "result": "passed",
+      "passed": 4,
+      "cases": [
+        "default globe",
+        "API failure retry",
+        "global alias search",
+        "public view hides write entrypoints"
+      ]
+    },
+    {
+      "name": "python_wheel_build",
+      "result": "passed"
+    },
+    {
+      "name": "compose_config",
+      "result": "passed",
+      "files": [
+        "docker-compose.prod.yml",
+        "deploy/firecrawl/docker-compose.yml"
+      ]
+    },
+    {
+      "name": "markdown_links_and_fences",
+      "result": "passed",
+      "files": 5
+    },
+    {
+      "name": "staged_file_safety",
+      "result": "passed",
+      "credential_pattern_findings": 0,
+      "excluded": "Databases, credentials, evidence caches, operational PII, generated output and private handover bundle"
+    },
+    {
+      "name": "existing_public_http",
+      "result": "passed",
+      "responses": {
+        "https://isite.cloud/health": 200,
+        "https://isite.cloud/runtime-config": 200,
+        "https://isite.cloud/ui/": 200
+      },
+      "mode": "public_view"
+    },
+    {
+      "name": "core_sqlite_backup_integrity",
+      "result": "ok",
+      "bundle_sha256": "3a850c73962bb15009020e198676177d368ebc794ca88a5eeb72b7efc5a77fe0"
+    },
+    {
+      "name": "npm_dependency_audit",
+      "result": "open findings",
+      "counts": {
+        "critical": 1,
+        "high": 4,
+        "moderate": 1,
+        "low": 1,
+        "total": 7
+      },
+      "critical_package": "maplibre-gl",
+      "suggested_fix": "6.11.2 (semver major; compatibility validation required)",
+      "artifact": "docs/handover_validation/2026-09-28_npm_audit.json"
+    },
+    {
+      "name": "fresh_docker_build",
+      "result": "passed",
+      "tag": "isite2-handover-check:20260928",
+      "runtime": "Python 3.12, Node 22 builder"
+    },
+    {
+      "name": "isolated_docker_http_smoke",
+      "result": "passed",
+      "database": "fresh disposable SQLite; no business or production data",
+      "responses": [
+        {
+          "method": "GET",
+          "path": "/health",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/runtime-config",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/ui/",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/map/country-summary",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/properties",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/updates",
+          "status": 200
+        },
+        {
+          "method": "POST",
+          "path": "/scan-runs",
+          "status": 403,
+          "expected": 403
+        }
+      ]
+    },
+    {
+      "name": "qa_controls_recheck",
+      "result": "passed",
+      "passed": 4
+    }
+  ],
+  "not_performed": [
+    "recipient permission transfer",
+    "production data publication",
+    "production rollback",
+    "customer email",
+    "full mobile browser suite",
+    "full business evidence re-audit",
+    "full production Compose/PostgreSQL restore rehearsal on recipient infrastructure"
+  ],
+  "raw_artifacts": "outputs/handover_20260928/ on source workstation, excluded from Git"
+}

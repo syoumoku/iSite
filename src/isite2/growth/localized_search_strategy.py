@@ -42,8 +42,13 @@ def country_language_profile(
 
     merged = {**default_profile, **country_profile}
     merged["languages"] = list(merged.get("languages") or ["en"])
+    merged["official_languages"] = list(merged.get("official_languages") or merged["languages"])
     merged["official_source_terms"] = list(merged.get("official_source_terms") or [])
     merged["preferred_domains"] = list(merged.get("preferred_domains") or [])
+    merged["primary_search_engines"] = list(merged.get("primary_search_engines") or [])
+    merged["search_engine_profile_required"] = bool(
+        merged.get("search_engine_profile_required", True)
+    )
     return merged
 
 
@@ -149,4 +154,3 @@ def build_localized_queries(
                     )
                 )
     return queries
-

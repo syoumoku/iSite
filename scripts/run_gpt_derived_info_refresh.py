@@ -18,6 +18,12 @@ def main() -> None:
     )
     parser.add_argument("--scan-run-id")
     parser.add_argument(
+        "--property-id",
+        action="append",
+        dest="property_ids",
+        help="Limit refresh to one property id. May be passed multiple times.",
+    )
+    parser.add_argument(
         "--provider",
         choices=["gpt", "codex-oauth", "auto", "rule"],
         default="codex-oauth",
@@ -42,6 +48,7 @@ def main() -> None:
         summary = refresh_active_derived_info(
             repository.engine,
             scan_run_id=args.scan_run_id,
+            property_ids=args.property_ids,
             provider_mode=args.provider,
             limit=args.limit,
             cache_dir=cache_dir,
@@ -96,6 +103,14 @@ def _render_report(summary: dict) -> str:
     )
     if not errors:
         errors = "- none"
+    gate = summary["qa_after"].get("data_integrity_gate", {})
+    gate_counts = gate.get("counts", {})
+    gate_lines = [
+        f"- Passed: {gate.get('passed')}",
+        f"- Blocking issues: {gate.get('blocking_issue_count', 0)}",
+    ]
+    for key in sorted(gate_counts):
+        gate_lines.append(f"- {key}: {gate_counts[key]}")
     return (
         "# GPT Derived Info Refresh\n\n"
         f"- Provider: {summary['provider']}\n"
@@ -104,6 +119,8 @@ def _render_report(summary: dict) -> str:
         f"- Errors: {summary['error_count']}\n\n"
         "## Scene QA\n"
         + "\n".join(scene_lines)
+        + "\n\n## Data Integrity Gate\n"
+        + "\n".join(gate_lines)
         + "\n\n## Errors\n"
         + errors
         + "\n"

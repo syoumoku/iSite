@@ -1,7 +1,14 @@
+x-json-logging: &json-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "3"
+
 services:
   postgres:
     image: postgis/postgis:16-3.4
     restart: unless-stopped
+    logging: *json-logging
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-isite2_public}
       POSTGRES_USER: ${POSTGRES_USER:-isite}
@@ -19,20 +26,40 @@ services:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
+    logging: *json-logging
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-isite}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-isite2_public}
+      ISITE2_OPS_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-isite}:${POSTGRES_PASSWORD}@postgres:5432/${ISITE2_OPS_DB:-isite2_ops}
       ISITE2_APP_MODE: public_view
       ISITE2_ENABLE_OVERLAY_SYNC: "0"
+      ISITE2_APP_AUTH_ENABLED: ${ISITE2_APP_AUTH_ENABLED:-1}
+      ISITE2_APP_AUTH_USER: ${ISITE2_APP_AUTH_USER:-visitor}
+      ISITE2_APP_AUTH_PASSWORD: ${ISITE2_APP_AUTH_PASSWORD:-visitor123456}
+      ISITE2_APP_AUTH_SECRET: ${ISITE2_APP_AUTH_SECRET:?set ISITE2_APP_AUTH_SECRET in the compose env file}
+      ISITE2_GUEST_CLICK_LIMIT: ${ISITE2_GUEST_CLICK_LIMIT:-10}
+      ISITE2_SERVICE_REQUESTS_ENABLED: ${ISITE2_SERVICE_REQUESTS_ENABLED:-1}
+      ISITE2_SERVICE_REQUEST_DAILY_LIMIT: ${ISITE2_SERVICE_REQUEST_DAILY_LIMIT:-10}
+      ISITE2_REQUEST_ADMIN_TOKEN: ${ISITE2_REQUEST_ADMIN_TOKEN:?set ISITE2_REQUEST_ADMIN_TOKEN in the compose env file}
+      ISITE2_FEATURE_EXPORTS_ENABLED: ${ISITE2_FEATURE_EXPORTS_ENABLED:-1}
+      ISITE2_PUBLIC_OOKLA_ENABLED: ${ISITE2_PUBLIC_OOKLA_ENABLED:-0}
+      ISITE2_PUBLIC_OOKLA_COUNTRY_ALLOWLIST: ${ISITE2_PUBLIC_OOKLA_COUNTRY_ALLOWLIST:-}
+      PLACER_API_KEY: ${PLACER_API_KEY:-}
+      PLACER_BASE_URL: ${PLACER_BASE_URL:-https://papi.placer.ai}
+      PLACER_FOOTFALL_ENDPOINT_TEMPLATE: ${PLACER_FOOTFALL_ENDPOINT_TEMPLATE:-}
+      ISITE2_PUBLIC_REPORT_ROOT: /app/public_reports
       ENVIRONMENT: production
+    volumes:
+      - ./public_reports:/app/public_reports:ro
     expose:
       - "8000"
 
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    logging: *json-logging
     depends_on:
       - web
     ports:
@@ -40,8 +67,6 @@ services:
       - "443:443"
     environment:
       ISITE2_PUBLIC_DOMAIN: ${ISITE2_PUBLIC_DOMAIN:?set ISITE2_PUBLIC_DOMAIN in the compose env file}
-      ISITE2_BASIC_AUTH_USER: ${ISITE2_BASIC_AUTH_USER:-client}
-      ISITE2_BASIC_AUTH_HASH: ${ISITE2_BASIC_AUTH_HASH:?set ISITE2_BASIC_AUTH_HASH in the compose env file}
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

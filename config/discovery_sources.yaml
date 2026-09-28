@@ -287,3 +287,32 @@ scenes:
         - "{country} cruise port DAS indoor network mobile operator"
       secondary_reference:
         - "{country} cruise port passenger traffic"
+  mosque:
+    scene_label: "mosque"
+    scan_priority: 55
+    priority_band: "secondary_landmark"
+    preferred_indicators:
+      - mosque_area
+      - gross_floor_area
+      - prayer_hall_area
+      - annual_visitors
+      - daily_visitors
+    query_templates:
+      official_government:
+        - "{country} mosque official area visitors"
+        - "{country} mosque tourism official visitors"
+      operator_venue:
+        - "{country} grand mosque official area visitors"
+      annual_report_pdf:
+        - "{country} mosque annual report visitors area filetype:pdf"
+      firecrawl_search:
+        - "{country} grand mosque official area annual visitors"
+        - "{country} largest mosque area visitor capacity official"
+        - "{country} mosque عدد الزوار مساحة المسجد"
+      map_entity:
+        - "{country} grand mosque coordinates"
+      operator_build_status:
+        - "{country} mosque indoor 5G coverage operator announcement"
+        - "{country} mosque DAS indoor mobile network"
+      secondary_reference:
+        - "{country} largest mosque area visitors"

@@ -2,18 +2,24 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from collections import Counter
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from isite2.growth.evidence_curation import run_pending_evidence_curation
+from isite2.growth.derived_refresh_trigger import refresh_derived_after_scan
 from isite2.growth.evidence_intake import (
+    DEFAULT_OVERLAY_PATH,
     CandidateDraft,
     candidate_key,
     candidate_keys,
     load_effective_source_registry,
+    load_registry_overlay,
     validate_candidate_draft,
+    write_registry_overlay,
 )
 from isite2.growth.evidence_store import EvidenceCurationStore
 from isite2.growth.overlay_sync import sync_overlay_to_active_repository
@@ -52,6 +58,23 @@ def main() -> None:
     parser.add_argument("--region", default="Asia Pacific")
     parser.add_argument("--skip-sync", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--allow-missing-image",
+        action="store_true",
+        help="Allow otherwise valid candidates without a hero image; missing images remain explicit.",
+    )
+    parser.add_argument(
+        "--designated-lead-mode",
+        action="store_true",
+        help=(
+            "Allow identity evidence for a user-designated lead whose quantitative "
+            "primary metric is still missing."
+        ),
+    )
+    parser.add_argument(
+        "--designation-source",
+        help="Auditable source label or URL for the designated lead list.",
+    )
     args = parser.parse_args()
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -73,19 +96,34 @@ def main() -> None:
     )
 
     accepted: list[CandidateDraft] = []
+    designated_missing_metric_keys: set[tuple[str, str, str, str]] = set()
+    accepted_missing_image_count = 0
     rejected: list[dict[str, Any]] = []
     skipped: Counter[str] = Counter()
     seen: set[tuple[str, str, str]] = set()
     for item in parsed:
-        if not _real_image(item.get("image_url")):
+        has_real_image = _real_image(item.get("image_url"))
+        if not has_real_image and not args.allow_missing_image:
             skipped["missing_real_image"] += 1
             rejected.append(_reject(item, "missing real property image"))
             continue
+        missing_objective_metric = not _has_objective_metric_value(item)
+        if missing_objective_metric and not args.designated_lead_mode:
+            skipped["missing_objective_metric_value"] += 1
+            rejected.append(_reject(item, "objective metric value is empty"))
+            continue
         if item.get("scene_type") == "transport_hub" and not _accepted_transport_metric(item):
             skipped["transport_metric_not_objective"] += 1
-            rejected.append(_reject(item, "transport metric is not daily ridership/interchange volume/line count"))
+            rejected.append(
+                _reject(
+                    item,
+                    "transport metric is not daily ridership/interchange volume/line count",
+                )
+            )
             continue
         metric = _metric(item)
+        if metric is None and args.designated_lead_mode and missing_objective_metric:
+            metric = ("property_identity", "property_identity")
         if metric is None:
             skipped["metric_not_supported"] += 1
             rejected.append(_reject(item, "metric is not accepted for scene objective evidence"))
@@ -107,6 +145,7 @@ def main() -> None:
             source_type=args.source_type,
             source_date=args.source_date,
             region=args.region,
+            designated_missing_metric=missing_objective_metric,
         )
         validation = validate_candidate_draft(draft)
         if not validation.accepted:
@@ -129,6 +168,17 @@ def main() -> None:
             rejected.append(_reject(item, identity_match.reason or identity_match.status))
             continue
         accepted.append(draft)
+        if missing_objective_metric:
+            designated_missing_metric_keys.add(
+                candidate_key(
+                    draft.country,
+                    draft.city,
+                    draft.property_name,
+                    draft.scene_type,
+                )
+            )
+        if not has_real_image:
+            accepted_missing_image_count += 1
 
     raw_ids: list[str] = []
     written_or_changed = 0
@@ -142,9 +192,46 @@ def main() -> None:
             if result.is_new_evidence or result.is_changed_evidence:
                 written_or_changed += 1
         curation = run_pending_evidence_curation(store=store, output_dir=args.output_dir)
+        overlay_hero_image_update_count = _sync_accepted_hero_images_to_overlay(
+            DEFAULT_OVERLAY_PATH,
+            accepted,
+        )
+        if designated_missing_metric_keys:
+            _mark_designated_missing_metric_candidates(
+                DEFAULT_OVERLAY_PATH,
+                designated_missing_metric_keys,
+                designation_source=(
+                    args.designation_source
+                    or ", ".join(str(path) for path in args.input_files if path.exists())
+                ),
+            )
         if not args.skip_sync:
             repository = SQLAlchemyScanRunRepository.from_url(args.db_url, storage_mode="sqlite")
-            sync = sync_overlay_to_active_repository(repository)
+            sync = sync_overlay_to_active_repository(repository, refresh_derived=False)
+            if sync.run_id is not None and written_or_changed:
+                property_ids = _accepted_property_ids(
+                    repository,
+                    sync.run_id,
+                    accepted,
+                )
+                targeted_refresh = (
+                    refresh_derived_after_scan(
+                        repository,
+                        sync.run_id,
+                        property_ids=property_ids,
+                    )
+                    if property_ids
+                    else {
+                        "mode": "gpt_derived_info_refresh",
+                        "scan_run_id": str(sync.run_id),
+                        "property_ids": [],
+                        "skipped_reason": (
+                            "changed candidates did not resolve to active property ids; "
+                            "unscoped refresh was not attempted"
+                        ),
+                    }
+                )
+                sync = replace(sync, derived_refresh=targeted_refresh)
 
     summary = {
         "mode": args.source_type,
@@ -152,12 +239,17 @@ def main() -> None:
         "input_files": [str(path) for path in args.input_files if path.exists()],
         "parsed_count": len(parsed),
         "accepted_count": len(accepted),
+        "accepted_missing_image_count": accepted_missing_image_count,
+        "designated_missing_primary_metric_count": len(designated_missing_metric_keys),
         "accepted_by_country": dict(Counter(draft.country for draft in accepted)),
         "accepted_by_scene": dict(Counter(draft.scene_type for draft in accepted)),
         "skipped": dict(skipped),
         "rejected_count": len(rejected),
         "rejected": rejected[:100],
         "raw_evidence_written_or_changed": written_or_changed,
+        "overlay_hero_image_update_count": (
+            overlay_hero_image_update_count if accepted and not args.dry_run else 0
+        ),
         "raw_evidence_ids": raw_ids,
         "curation": _curation_summary(curation),
         "overlay_sync": _sync_summary(sync),
@@ -201,18 +293,36 @@ def _real_image(url: Any) -> bool:
     text = str(url or "").strip()
     if not text.startswith(("http://", "https://")):
         return False
-    lowered = text.casefold()
-    return not any(token in lowered for token in PLACEHOLDER_TOKENS)
+    return not _contains_placeholder_image_token(text)
+
+
+def _contains_placeholder_image_token(url: str) -> bool:
+    lowered = url.casefold()
+    if "googleads" in lowered:
+        return True
+    parts = [part for part in re.split(r"[^a-z0-9]+", lowered) if part]
+    part_set = set(parts)
+    if {"placeholder", "logo"} & part_set:
+        return True
+    if {"icon", "icons", "favicon"} & part_set:
+        return True
+    if {"map", "maps", "staticmap", "staticmaps", "maptile", "maptiles"} & part_set:
+        return True
+    return False
 
 
 def _accepted_transport_metric(item: dict[str, Any]) -> bool:
-    text = f"{item.get('objective_metric_name', '')} {item.get('objective_metric_value', '')}".casefold()
-    return any(token in text for token in ("daily", "ridership", "passenger", "line count", "lines"))
+    text = _objective_metric_text(item)
+    if _line_count_from_text(text) is not None:
+        return True
+    return "ridership" in text or (
+        "daily" in text and any(token in text for token in ("passenger", "boarding"))
+    )
 
 
 def _metric(item: dict[str, Any]) -> tuple[str, str] | None:
     scene = str(item.get("scene_type") or "")
-    text = f"{item.get('objective_metric_name', '')} {item.get('objective_metric_value', '')}".casefold()
+    text = _objective_metric_text(item)
     if scene == "airport_terminal":
         if "capacity" in text:
             return "terminal_capacity", "terminal_capacity"
@@ -222,8 +332,37 @@ def _metric(item: dict[str, Any]) -> tuple[str, str] | None:
         if any(token in text for token in ("seat", "capacity")):
             return "seat_count", "seat_count"
     if scene == "mall_mixed_use":
-        if any(token in text for token in ("gfa", "floor area", "gross", "area", "m2", "sqm")):
+        if any(
+            token in text
+            for token in (
+                "gfa",
+                "nla",
+                "floor area",
+                "gross",
+                "area",
+                "m2",
+                "sqm",
+                "square meter",
+                "square metre",
+            )
+        ):
+            if "nla" in text:
+                return "mixed_use_area", "mixed_use_area"
             return "retail_gfa", "retail_gfa"
+        if any(
+            token in text
+            for token in (
+                "annual footfall",
+                "annual visits",
+                "annual visitors",
+                "footfall",
+                "visits",
+                "visitors",
+                "visitor",
+                "afluencia",
+            )
+        ):
+            return "annual_footfall", "annual_footfall"
         if any(token in text for token in ("largest", "flagship")):
             return "flagship_position", "flagship_position"
     if scene == "office_government":
@@ -276,10 +415,33 @@ def _metric(item: dict[str, Any]) -> tuple[str, str] | None:
         if any(token in text for token in ("room", "key")):
             return "keys", "keys"
     if scene == "transport_hub":
-        if any(token in text for token in ("daily", "ridership", "passenger")):
-            return "daily_ridership", "daily_ridership"
-        if "line" in text:
+        if _line_count_from_text(text) is not None:
             return "line_count", "line_count"
+        if "ridership" in text or (
+            "daily" in text and any(token in text for token in ("passenger", "boarding"))
+        ):
+            return "daily_ridership", "daily_ridership"
+    if scene == "cruise_port":
+        if any(
+            token in text
+            for token in (
+                "passenger throughput",
+                "annual passengers",
+                "cruise passengers",
+            )
+        ):
+            return "passenger_throughput", "passenger_throughput"
+        if any(
+            token in text
+            for token in (
+                "international_cruise_calls",
+                "international cruise calls",
+                "scheduled call",
+                "scheduled calls",
+                "cruise call frequency",
+            )
+        ):
+            return "international_cruise_frequency", "international_cruise_frequency"
     if scene == "hospital":
         if "bed" in text:
             return "beds", "beds"
@@ -288,6 +450,76 @@ def _metric(item: dict[str, Any]) -> tuple[str, str] | None:
     if scene == "university":
         if any(token in text for token in ("enrollment", "student", "campus population")):
             return "enrollment", "enrollment"
+    if scene == "mosque":
+        if any(
+            token in text
+            for token in (
+                "annual visitors",
+                "annual_visitors",
+                "annual visits",
+                "annual_visits",
+                "annual footfall",
+                "annual_footfall",
+                "yearly visitors",
+                "visitor count",
+                "number of visitors",
+                "عدد الزوار",
+                "زائر",
+                "زوار",
+            )
+        ):
+            return "annual_visitors", "annual_visitors"
+        if any(token in text for token in ("daily visitors", "daily visits")):
+            return "daily_visitors", "daily_visitors"
+        if any(
+            token in text
+            for token in (
+                "prayer hall area",
+                "prayer area",
+                "gross floor area",
+                "floor area",
+                "built-up area",
+                "built up area",
+                "mosque area",
+                "area",
+                "sqm",
+                "sq m",
+                "m2",
+                "m²",
+                "مساحة",
+            )
+        ):
+            return "mosque_area", "mosque_area"
+    return None
+
+
+def _objective_metric_text(item: dict[str, Any]) -> str:
+    return (
+        f"{item.get('objective_metric_name', '')} "
+        f"{item.get('objective_metric_value', '')}"
+    ).casefold()
+
+
+def _has_objective_metric_value(item: dict[str, Any]) -> bool:
+    return bool(str(item.get("objective_metric_value") or "").strip())
+
+
+def _line_count_from_text(text: str) -> int | None:
+    patterns = [
+        r"\bline[_\s]*count\b[^0-9]{0,24}(\d{1,3})\b",
+        r"\b(\d{1,3})\s*(?:rail/metro\s*)?(?:metro\s*)?(?:rail\s*)?"
+        r"(?:lines|routes)\b",
+        r"\b(\d{1,3})\s+(?:[a-z]+[/\s]+){1,3}(?:lines|routes)\b",
+        r"\b(?:serves|served\s+by|connected\s+to|interchange\s+with)\s+"
+        r"(\d{1,3})\s*(?:metro\s*)?(?:rail\s*)?(?:lines|routes)\b",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if not match:
+            continue
+        value = int(match.group(1))
+        if 1 <= value <= 20:
+            return value
     return None
 
 
@@ -299,6 +531,7 @@ def _draft(
     source_type: str,
     source_date: str,
     region: str,
+    designated_missing_metric: bool = False,
 ) -> CandidateDraft:
     country = str(item["country"])
     scene_type = str(item["scene_type"])
@@ -306,6 +539,9 @@ def _draft(
     field_group, indicator_name = metric
     value = str(item.get("objective_metric_value") or "")
     name = str(item.get("objective_metric_name") or indicator_name)
+    if designated_missing_metric:
+        value = "Exact property identity confirmed; quantitative scene primary metric missing."
+        name = "Designated lead identity"
     annual_visits = (
         float(item["annual_visits_estimate"])
         if item.get("annual_visits_estimate") not in {None, ""}
@@ -326,26 +562,127 @@ def _draft(
         field_group=field_group,
         indicator_name=indicator_name,
         field_value=f"{name}: {value}",
-        source_name=str(item.get("evidence_source_name") or "Firecrawl discovered public source"),
-        source_tier=str(item.get("evidence_source_tier") or "Tier 2"),
-        source_url=str(item["evidence_source_url"]),
-        source_date=str(item.get("evidence_source_date") or source_date),
-        evidence_type="Direct",
+        source_name=str(
+            _evidence_value(item, "evidence_source_name", "source_name")
+            or "Firecrawl discovered public source"
+        ),
+        source_tier=str(
+            _evidence_value(item, "evidence_source_tier", "source_tier") or "Tier 2"
+        ),
+        source_url=str(_evidence_value(item, "evidence_source_url", "source_url") or ""),
+        source_date=str(
+            _evidence_value(item, "evidence_source_date", "source_date") or source_date
+        ),
+        evidence_type="Context" if designated_missing_metric else "Direct",
         bbox=bbox,
         source_type=source_type,
         content_text=str(item.get("confidence_notes") or ""),
-        hero_image={
-            "url": str(item["image_url"]),
-            "alt_text": f"{item.get('property_name')} public property image",
-            "source_name": str(item.get("image_source_name") or "Public web image"),
-            "source_url": str(item.get("image_source_url") or item.get("image_url")),
-        },
+        hero_image=_hero_image(item),
     )
+
+
+def _mark_designated_missing_metric_candidates(
+    overlay_path: Path,
+    keys: set[tuple[str, str, str, str]],
+    *,
+    designation_source: str,
+) -> None:
+    overlay = load_registry_overlay(overlay_path)
+    for country, country_registry in overlay.get("countries", {}).items():
+        for candidate in country_registry.get("candidates", []) or []:
+            key = candidate_key(
+                country,
+                candidate.get("city", ""),
+                candidate.get("property_name", ""),
+                candidate.get("scene_type", ""),
+            )
+            if key not in keys:
+                continue
+            candidate["designated_lead"] = True
+            candidate["primary_metric_status"] = "missing"
+            candidate["designation_source"] = designation_source
+    write_registry_overlay(overlay_path, overlay)
+
+
+def _hero_image(item: dict[str, Any]) -> dict[str, str] | None:
+    if not _real_image(item.get("image_url")):
+        return None
+    return {
+        "url": str(item["image_url"]),
+        "alt_text": f"{item.get('property_name')} public property image",
+        "source_name": str(item.get("image_source_name") or "Public web image"),
+        "source_url": str(item.get("image_source_url") or item.get("image_url")),
+    }
+
+
+def _sync_accepted_hero_images_to_overlay(
+    overlay_path: Path,
+    accepted: list[CandidateDraft],
+) -> int:
+    """Persist image-only changes without bypassing evidence curation for new candidates."""
+    overlay = load_registry_overlay(overlay_path)
+    image_by_key = {
+        candidate_key(
+            draft.country,
+            draft.city,
+            draft.property_name,
+            draft.scene_type,
+        ): dict(draft.hero_image)
+        for draft in accepted
+        if draft.hero_image
+    }
+    changed = 0
+    for country, country_registry in overlay.get("countries", {}).items():
+        for candidate in country_registry.get("candidates", []) or []:
+            key = candidate_key(
+                country,
+                candidate.get("city", ""),
+                candidate.get("property_name", ""),
+                candidate.get("scene_type", ""),
+            )
+            hero_image = image_by_key.get(key)
+            if hero_image is None or candidate.get("hero_image") == hero_image:
+                continue
+            candidate["hero_image"] = hero_image
+            changed += 1
+    if changed:
+        write_registry_overlay(overlay_path, overlay)
+    return changed
+
+
+def _evidence_value(
+    item: dict[str, Any],
+    flat_key: str,
+    nested_key: str,
+) -> Any:
+    value = item.get(flat_key)
+    if value not in {None, ""}:
+        return value
+    evidence = item.get("evidence")
+    if not isinstance(evidence, list):
+        return None
+    for row in evidence:
+        if not isinstance(row, dict):
+            continue
+        value = row.get(nested_key)
+        if value not in {None, ""}:
+            return value
+    return None
 
 
 def _geocode_precision(item: dict[str, Any]) -> str:
     provided = str(item.get("geocode_precision") or "").strip()
     if provided:
+        scene_type = str(item.get("scene_type") or "")
+        normalized = provided.casefold()
+        if scene_type == "airport_terminal" and not any(
+            token in normalized for token in ("airport", "aerodrome", "terminal")
+        ):
+            return f"{provided}; airport venue centroid"
+        if scene_type == "cruise_port" and not any(
+            token in normalized for token in ("port", "cruise", "terminal")
+        ):
+            return f"{provided}; cruise port centroid"
         return provided
     scene_type = str(item.get("scene_type") or "")
     return {
@@ -356,7 +693,43 @@ def _geocode_precision(item: dict[str, Any]) -> str:
         "convention_center": "convention venue centroid",
         "luxury_hotel_mice": "hotel venue centroid",
         "transport_hub": "rail or metro station centroid",
+        "mosque": "mosque building centroid",
+        "cruise_port": "cruise port or terminal centroid",
     }.get(scene_type, "venue centroid")
+
+
+def _accepted_property_ids(
+    repository: SQLAlchemyScanRunRepository,
+    run_id: Any,
+    accepted: list[CandidateDraft],
+) -> list[str]:
+    accepted_keys = {
+        (
+            draft.country.casefold(),
+            draft.city.casefold(),
+            draft.property_name.casefold(),
+            draft.scene_type.casefold(),
+        )
+        for draft in accepted
+    }
+    property_ids = {
+        str(packet.entity.property_id)
+        for packet in repository.list_properties({"scan_run_id": str(run_id)})
+        if (
+            packet.entity.country.casefold(),
+            packet.entity.city.casefold(),
+            packet.entity.property_name.casefold(),
+            str(
+                getattr(
+                    packet.entity.scene_type,
+                    "value",
+                    packet.entity.scene_type,
+                )
+            ).casefold(),
+        )
+        in accepted_keys
+    }
+    return sorted(property_ids)
 
 
 def _reject(item: dict[str, Any], reason: str) -> dict[str, Any]:
@@ -365,7 +738,7 @@ def _reject(item: dict[str, Any], reason: str) -> dict[str, Any]:
         "property_name": item.get("property_name"),
         "scene_type": item.get("scene_type"),
         "reason": reason,
-        "source_url": item.get("evidence_source_url"),
+        "source_url": _evidence_value(item, "evidence_source_url", "source_url"),
     }
 
 

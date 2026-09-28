@@ -52,11 +52,29 @@ class PropertyHeroImage(BaseModel):
     license: str | None = None
 
 
+class CityAssignment(BaseModel):
+    city_id: str | None = None
+    canonical_city: str = ""
+    source_city: str
+    locality: str | None = None
+    admin_area_1: str | None = None
+    admin_area_2: str | None = None
+    mapping_status: str = Field(pattern="^(verified|review_required|unmapped)$")
+    mapping_method: str
+    grouping_basis: str | None = None
+    source_authority: str | None = None
+    source_url: str | None = None
+    source_date: str | None = None
+    source_hash: str | None = None
+    mapping_version: str | None = None
+
+
 class PropertyEntity(BaseModel):
     property_id: UUID = Field(default_factory=uuid4)
     country: str
     city: str
     property_name: str
+    aliases: list[str] = Field(default_factory=list)
     scene_type: str
     scene_form: SceneForm
     latitude: float
@@ -67,6 +85,7 @@ class PropertyEntity(BaseModel):
     google_maps_link: str | None = None
     coordinate_status: str = "Verified"
     hero_image: PropertyHeroImage | None = None
+    city_assignment: CityAssignment | None = None
 
     @field_validator("latitude")
     @classmethod
@@ -135,6 +154,89 @@ class DemandEstimate(BaseModel):
     cannot_calculate_reason: str | None = None
 
 
+class TrafficEstimate(BaseModel):
+    model_version: str
+    estimate_method: str
+    input_hash: str
+    selected_metric_key: str | None = None
+    selected_metric_value: float | None = None
+    selected_metric_unit: str | None = None
+    selected_evidence_ids: list[str] = Field(default_factory=list)
+    annual_visits_p10: float | None = None
+    annual_visits_p50: float | None = None
+    annual_visits_p90: float | None = None
+    typical_day_visits_p10: float | None = None
+    typical_day_visits_p50: float | None = None
+    typical_day_visits_p90: float | None = None
+    peak_day_visits_p10: float | None = None
+    peak_day_visits_p50: float | None = None
+    peak_day_visits_p90: float | None = None
+    busy_hour_users_p10: float | None = None
+    busy_hour_users_p50: float | None = None
+    busy_hour_users_p90: float | None = None
+    busy_hour_traffic_gb_p10: float | None = None
+    busy_hour_traffic_gb_p50: float | None = None
+    busy_hour_traffic_gb_p90: float | None = None
+    busy_hour_bandwidth_mbps_p10: float | None = None
+    busy_hour_bandwidth_mbps_p50: float | None = None
+    busy_hour_bandwidth_mbps_p90: float | None = None
+    confidence: str
+    activation_status: str = "not_evaluated"
+    activation_reason: str | None = None
+    parameter_snapshot: dict[str, Any] = Field(default_factory=dict)
+    qa_flags: list[str] = Field(default_factory=list)
+    cannot_calculate_reason: str | None = None
+    calculated_at: datetime | None = None
+
+
+class ComplaintSignal(BaseModel):
+    valid_complaint_count: int = 0
+    weighted_complaint_count: float = 0
+    source_count: int = 0
+    category_counts: dict[str, int] = Field(default_factory=dict)
+    pressure_level: str = "insufficient"
+    pressure_percentile: float | None = None
+    confidence: str = "insufficient"
+    period_days: int = 365
+    latest_observed_at: datetime | None = None
+    data_freshness: str | None = None
+
+
+class NetworkPerformanceMetric(BaseModel):
+    service_type: str
+    period: str
+    quadkey: str
+    avg_download_mbps: float
+    avg_upload_mbps: float
+    avg_latency_ms: float
+    avg_loaded_latency_down_ms: float | None = None
+    avg_loaded_latency_up_ms: float | None = None
+    tests: int
+    devices: int
+    match_method: str
+    distance_m: float
+    confidence: str
+    performance_class: str
+    trend: str | None = None
+    proxy_scope: str = "surrounding_z16_tile"
+    source_url: str | None = None
+    license: str | None = None
+    data_freshness: str | None = None
+
+
+class OoklaSignals(BaseModel):
+    mobile: NetworkPerformanceMetric | None = None
+    fixed: NetworkPerformanceMetric | None = None
+
+
+class NetworkSignals(BaseModel):
+    complaints: ComplaintSignal | None = None
+    ookla: OoklaSignals = Field(default_factory=OoklaSignals)
+    network_validation_priority: str = "Normal"
+    validation_reasons: list[str] = Field(default_factory=list)
+    next_action: str | None = None
+
+
 class InferenceRecord(BaseModel):
     inferred_field: str
     inferred_value: str
@@ -180,6 +282,8 @@ class SitePacket(BaseModel):
     evidence: list[EvidenceItem] = Field(default_factory=list)
     build_status: BuildStatus
     demand: DemandEstimate | None = None
+    traffic_estimate: TrafficEstimate | None = None
+    network_signals: NetworkSignals | None = None
     inference: list[InferenceRecord] = Field(default_factory=list)
     conclusion: Conclusion
     review_queue: list[ReviewItem] = Field(default_factory=list)

@@ -8,7 +8,7 @@ import sqlite3
 import subprocess
 import time
 from collections import Counter
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 from isite2.growth.evidence_curation import run_pending_evidence_curation
@@ -29,7 +29,7 @@ from isite2.repositories.sqlalchemy import SQLAlchemyScanRunRepository
 DB_URL = "sqlite+pysqlite:///outputs/isite2_dev.db"
 OUTPUT_DIR = Path("outputs") / "regional_scan_loop"
 CACHE_DIR = OUTPUT_DIR / "structured_web_cache"
-TODAY = "2026-05-12"
+TODAY = date.today().isoformat()
 SOURCE_TYPE = "web_first_structured_landmark"
 USER_AGENT = "isite2-codex/0.1 public evidence research"
 QUERY_COOLDOWN_SECONDS = 65
@@ -37,6 +37,7 @@ SPARQL_MAX_TIME_SECONDS = 60
 
 COUNTRY_QIDS = {
     "Algeria": "Q262",
+    "Angola": "Q916",
     "Argentina": "Q414",
     "Bahamas": "Q778",
     "Barbados": "Q244",
@@ -47,19 +48,39 @@ COUNTRY_QIDS = {
     "Burkina Faso": "Q965",
     "Cameroon": "Q1009",
     "Central African Republic": "Q929",
+    "Chad": "Q657",
     "Chile": "Q298",
     "Colombia": "Q739",
     "Comoros": "Q970",
+    "Congo": "Q971",
     "Cote d'Ivoire": "Q1008",
+    "Czech Republic": "Q213",
+    "Democratic Republic of the Congo": "Q974",
     "Djibouti": "Q977",
     "Ecuador": "Q736",
     "Egypt": "Q79",
+    "Equatorial Guinea": "Q983",
+    "Eritrea": "Q986",
     "Gabon": "Q1000",
+    "Gambia": "Q1005",
+    "France": "Q142",
+    "Germany": "Q183",
     "Ghana": "Q117",
+    "Greece": "Q41",
+    "Guinea": "Q1006",
+    "Guinea-Bissau": "Q1007",
+    "Eswatini": "Q1050",
+    "Zimbabwe": "Q954",
+    "Reunion": "Q17070",
+    "Somalia": "Q1045",
     "Kenya": "Q114",
+    "Lesotho": "Q1013",
     "Liberia": "Q1014",
     "Libya": "Q1016",
+    "Madagascar": "Q1019",
     "Malawi": "Q1020",
+    "Mali": "Q912",
+    "Mauritania": "Q1025",
     "Mauritius": "Q1027",
     "Mexico": "Q96",
     "Morocco": "Q1028",
@@ -73,14 +94,57 @@ COUNTRY_QIDS = {
     "Sao Tome and Principe": "Q1039",
     "Sierra Leone": "Q1044",
     "South Africa": "Q258",
+    "South Sudan": "Q958",
     "Suriname": "Q730",
     "Tanzania": "Q924",
+    "Thailand": "Q869",
+    "Togo": "Q945",
     "Zambia": "Q953",
     "Sri Lanka": "Q854",
     "Cambodia": "Q424",
     "Maldives": "Q826",
     "Turkey": "Q43",
     "Philippines": "Q928",
+    "Vietnam": "Q881",
+    "Indonesia": "Q252",
+    "Tunisia": "Q948",
+    "Uganda": "Q1036",
+    "Slovakia": "Q214",
+    "Moldova": "Q217",
+    "Cyprus": "Q229",
+    "Albania": "Q222",
+    "North Macedonia": "Q221",
+    "Bulgaria": "Q219",
+    "Croatia": "Q224",
+    "Slovenia": "Q215",
+    "Bosnia and Herzegovina": "Q225",
+    "Serbia": "Q403",
+    "Montenegro": "Q236",
+    "Nicaragua": "Q811",
+    "Venezuela": "Q717",
+    "Haiti": "Q790",
+    "Uruguay": "Q77",
+    "Papua New Guinea": "Q691",
+    "Solomon Islands": "Q685",
+    "Fiji": "Q712",
+    "Nepal": "Q837",
+    "Laos": "Q819",
+    "Brunei": "Q921",
+    "Afghanistan": "Q889",
+    "Yemen": "Q805",
+    "Lebanon": "Q822",
+    "Bahrain": "Q398",
+    "Kuwait": "Q817",
+    "Kazakhstan": "Q232",
+    "Pakistan": "Q843",
+    "Uzbekistan": "Q265",
+    "Georgia": "Q230",
+    "Azerbaijan": "Q227",
+    "Kyrgyzstan": "Q813",
+    "Mongolia": "Q711",
+    "Tajikistan": "Q863",
+    "Turkmenistan": "Q874",
+    "Armenia": "Q399",
 }
 
 OFFICE_ALLOW = re.compile(
@@ -120,6 +184,12 @@ def main() -> None:
         default="landmark",
         help="landmark runs the broad first-pass set; gap targets weak second-pass scenes.",
     )
+    parser.add_argument(
+        "--scenes",
+        nargs="+",
+        default=None,
+        help="Optional scene/query names to run, e.g. stadium mall_mixed_use.",
+    )
     parser.add_argument("--query-cooldown-seconds", type=int, default=QUERY_COOLDOWN_SECONDS)
     args = parser.parse_args()
 
@@ -135,12 +205,22 @@ def main() -> None:
     countries = args.countries or _active_countries()
     if args.countries is None and not args.include_brazil:
         countries = [country for country in countries if country != "Brazil"]
+    unsupported_countries = [country for country in countries if country not in COUNTRY_QIDS]
+    if args.countries and unsupported_countries:
+        raise SystemExit(
+            "Unsupported explicit countries: " + ", ".join(sorted(unsupported_countries))
+        )
     countries = [country for country in countries if country in COUNTRY_QIDS]
+    if not countries:
+        raise SystemExit("No supported countries selected; refusing to run global curation or sync.")
     country_values = _country_values(countries)
 
     planned: list[CandidateDraft] = []
     query_stats: list[dict[str, object]] = []
     queries = _gap_queries(country_values) if args.query_set == "gap" else _queries(country_values)
+    if args.scenes:
+        requested_scenes = {scene.strip() for scene in args.scenes if scene.strip()}
+        queries = [(query_name, query) for query_name, query in queries if query_name in requested_scenes]
     for query_index, (query_name, query) in enumerate(queries):
         rows = _sparql(query_name, query)
         query_stats.append({"query": query_name, "rows": len(rows)})
@@ -876,6 +956,8 @@ def _city(row: dict, country: str) -> str:
     if city and country not in {"Brazil"}:
         if _is_brazil_restricted_city(city):
             return ""
+        if _is_non_city_admin_label(city):
+            return ""
         return city
     article = _value(row, "article") or ""
     label = _value(row, "itemLabel") or ""
@@ -897,6 +979,66 @@ def _city(row: dict, country: str) -> str:
         "Panama City",
         "Buenos Aires",
         "Santiago",
+        "Malabo",
+        "Bata",
+        "Bissau",
+        "Mbabane",
+        "Manzini",
+        "Harare",
+        "Bulawayo",
+        "Saint-Denis",
+        "Mogadishu",
+        "Hargeisa",
+        "Bratislava",
+        "Košice",
+        "Chișinău",
+        "Nicosia",
+        "Limassol",
+        "Tirana",
+        "Skopje",
+        "Sofia",
+        "Plovdiv",
+        "Zagreb",
+        "Split",
+        "Ljubljana",
+        "Sarajevo",
+        "Banja Luka",
+        "Belgrade",
+        "Novi Sad",
+        "Podgorica",
+        "Managua",
+        "Caracas",
+        "Maracaibo",
+        "Port-au-Prince",
+        "Montevideo",
+        "Port Moresby",
+        "Lae",
+        "Honiara",
+        "Suva",
+        "Nadi",
+        "Kathmandu",
+        "Pokhara",
+        "Vientiane",
+        "Luang Prabang",
+        "Bandar Seri Begawan",
+        "Kabul",
+        "Herat",
+        "Sana'a",
+        "Aden",
+        "Beirut",
+        "Manama",
+        "Tbilisi",
+        "Batumi",
+        "Baku",
+        "Ganja",
+        "Bishkek",
+        "Osh",
+        "Ulaanbaatar",
+        "Dushanbe",
+        "Khujand",
+        "Ashgabat",
+        "Yerevan",
+        "Gyumri",
     ]
     for token in known_city_tokens:
         if country != "Brazil" and _is_brazil_restricted_city(token):
@@ -913,6 +1055,28 @@ def _city(row: dict, country: str) -> str:
             return ""
         return "Rio de Janeiro" if "Rio" in text or city in {"Centro", "Barra da Tijuca", "Ipanema District"} else "São Paulo"
     return city
+
+
+_ADMIN_CITY_LEVEL_TOKENS = {
+    "administrative",
+    "area",
+    "canton",
+    "county",
+    "department",
+    "district",
+    "governorate",
+    "municipality",
+    "oblast",
+    "province",
+    "region",
+    "raion",
+    "state",
+}
+
+
+def _is_non_city_admin_label(label: str) -> bool:
+    words = set(_clean_label(label).casefold().split())
+    return bool(words & _ADMIN_CITY_LEVEL_TOKENS)
 
 
 def _region_for_country(country: str) -> str:

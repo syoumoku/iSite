@@ -66,6 +66,33 @@ class FakeHttpClient:
         )
 
 
+class AmbiguousAccraHttpClient(FakeHttpClient):
+    def get_json(self, url: str, *, timeout: int = 30) -> dict:
+        if "list=search" in url:
+            return {"query": {"search": [{"title": "Accra"}]}}
+        if "prop=revisions" in url:
+            return {
+                "query": {
+                    "pages": [
+                        {
+                            "title": "Accra",
+                            "fullurl": "https://en.wikipedia.org/wiki/Accra",
+                            "revisions": [
+                                {
+                                    "slots": {
+                                        "main": {
+                                            "content": "{{Infobox settlement\n| area_metro_km2 = 3245\n}}"
+                                        }
+                                    }
+                                }
+                            ],
+                        }
+                    ]
+                }
+            }
+        return super().get_json(url, timeout=timeout)
+
+
 def test_mediawiki_adapter_extracts_primary_metric_and_hero() -> None:
     target = _target(property_name="Maracana Stadium", scene_type="stadium")
     evidence = MediaWikiAdapter(FakeHttpClient()).collect(target)
@@ -74,6 +101,12 @@ def test_mediawiki_adapter_extracts_primary_metric_and_hero() -> None:
     assert any(item.field_group == "seat_count" for item in evidence)
     assert any("78,838" in item.field_value for item in evidence)
     assert evidence[0].hero_image["url"].startswith("https://upload.wikimedia.org/")
+
+
+def test_mediawiki_adapter_rejects_ambiguous_city_entity_match() -> None:
+    target = _target(property_name="Accra Mall", scene_type="mall_mixed_use")
+
+    assert MediaWikiAdapter(AmbiguousAccraHttpClient()).collect(target) == []
 
 
 def test_dbpedia_adapter_extracts_structured_capacity() -> None:

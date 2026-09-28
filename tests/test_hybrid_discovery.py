@@ -55,6 +55,24 @@ class NoSearchProvider:
         return []
 
 
+class FakeSearchManifestProvider:
+    enabled = True
+
+    def __init__(self) -> None:
+        self.search_count = 0
+
+    def search(self, query: str, limit: int = 5) -> list[SearchResult]:
+        self.search_count += 1
+        return [
+            SearchResult(
+                title="Algiers International Airport official report",
+                url="https://airport.example.dz/algiers-international-airport/report",
+                source_name="Search Manifest",
+                snippet="Official passenger traffic.",
+            )
+        ]
+
+
 class FakePublicProvider:
     def __init__(
         self,
@@ -491,6 +509,44 @@ def test_firecrawl_search_result_flows_through_raw_evidence_store(tmp_path) -> N
     assert result.new_count == 1
     assert rows[0]["field_value"] == "8,000,000 passengers"
     assert rows[0]["source_type"] == "firecrawl_search"
+
+
+def test_manifest_results_use_web_fetch_provider_without_default_firecrawl(tmp_path) -> None:
+    store = EvidenceCurationStore(database_url=f"sqlite:///{tmp_path / 'evidence.db'}")
+    public_provider = FakePublicProvider(
+        content_text=(
+            "Algiers International Airport official report. "
+            "The airport handled 8,000,000 passengers in 2024."
+        )
+    )
+    fetch_provider = FakePublicProvider(
+        content_text=(
+            "Algiers International Airport official report. "
+            "The airport handled 8,000,000 passengers in 2024."
+        )
+    )
+    manifest_provider = FakeSearchManifestProvider()
+    provider = HybridPublicDiscoveryProvider(
+        store=store,
+        public_provider=public_provider,
+        web_fetch_provider=fetch_provider,
+        search_manifest_provider=manifest_provider,
+        serpapi_provider=NoSearchProvider(),
+        seed_provider=EmptySeedProvider(),
+        max_searches_per_cycle=1,
+        max_fetches_per_cycle=1,
+        recheck_after_seconds=0,
+        discovery_config=DISCOVERY_CONFIG,
+        target_countries=["Algeria"],
+    )
+
+    result = discover_public_evidence(regions=["Africa"], store=store, provider=provider)
+
+    assert provider.firecrawl_provider is None
+    assert manifest_provider.search_count == 1
+    assert fetch_provider.fetch_count == 1
+    assert result.firecrawl_search_count == 0
+    assert result.firecrawl_fetch_count == 0
 
 
 def test_firecrawl_retryable_failure_records_error_without_raw_evidence(tmp_path) -> None:

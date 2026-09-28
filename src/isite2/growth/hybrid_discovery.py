@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass, field, replace
 from typing import Any
@@ -9,7 +10,9 @@ from isite2.connectors.extraction import extract_indicators
 from isite2.connectors.firecrawl import FirecrawlPublicEvidenceProvider
 from isite2.connectors.http import HttpPublicEvidenceProvider
 from isite2.connectors.models import FetchedPage, GeocodeResult, SearchResult
+from isite2.connectors.scrapling import ScraplingPublicEvidenceProvider
 from isite2.connectors.serpapi import SerpApiSearchProvider
+from isite2.connectors.web import PageFetchProvider, SearchManifestProvider
 from isite2.growth.discovery_priority import discovery_task_priority
 from isite2.growth.evidence_intake import (
     CandidateDraft,
@@ -66,6 +69,8 @@ class HybridPublicDiscoveryProvider(EvidenceIntakeProvider):
         store: EvidenceCurationStore | None = None,
         public_provider: HttpPublicEvidenceProvider | None = None,
         firecrawl_provider: FirecrawlPublicEvidenceProvider | None = None,
+        web_fetch_provider: PageFetchProvider | None = None,
+        search_manifest_provider: SearchManifestProvider | None = None,
         serpapi_provider: SerpApiSearchProvider | None = None,
         seed_provider: EvidenceIntakeProvider | None = None,
         max_searches_per_cycle: int = 20,
@@ -80,17 +85,36 @@ class HybridPublicDiscoveryProvider(EvidenceIntakeProvider):
         new_opportunities_only: bool = True,
         force_rescan_existing: bool = False,
         known_index: KnownOpportunityIndex | None = None,
+        allow_firecrawl_fallback: bool | None = None,
     ) -> None:
         self.store = store
+        explicit_public_provider = public_provider is not None
         self.public_provider = public_provider or HttpPublicEvidenceProvider(
             cache=store.source_cache() if store is not None else None
         )
-        self.firecrawl_provider = (
-            firecrawl_provider
-            if firecrawl_provider is not None
-            else FirecrawlPublicEvidenceProvider.from_env(
+        allow_firecrawl = (
+            allow_firecrawl_fallback
+            if allow_firecrawl_fallback is not None
+            else _env_bool("ISITE2_ALLOW_FIRECRAWL_FALLBACK", False)
+        )
+        self.firecrawl_provider = firecrawl_provider
+        if self.firecrawl_provider is None and allow_firecrawl:
+            self.firecrawl_provider = FirecrawlPublicEvidenceProvider.from_env(
                 cache=store.source_cache() if store is not None else None
             )
+        scrapling_provider = ScraplingPublicEvidenceProvider(
+            cache=store.source_cache() if store is not None else None
+        )
+        if web_fetch_provider is not None:
+            self.web_fetch_provider = web_fetch_provider
+        elif explicit_public_provider:
+            self.web_fetch_provider = self.public_provider
+        elif scrapling_provider.enabled:
+            self.web_fetch_provider = scrapling_provider
+        else:
+            self.web_fetch_provider = self.public_provider
+        self.search_manifest_provider = search_manifest_provider or SearchManifestProvider(
+            _manifest_paths_from_env()
         )
         self.serpapi_provider = serpapi_provider or SerpApiSearchProvider()
         self.seed_provider = seed_provider or SeedCatalogEvidenceIntakeProvider()
@@ -237,7 +261,9 @@ class HybridPublicDiscoveryProvider(EvidenceIntakeProvider):
 
     def _search_adapters(self) -> list[Any]:
         adapters: list[Any] = []
-        if getattr(self.firecrawl_provider, "enabled", False):
+        if getattr(self.search_manifest_provider, "enabled", False):
+            adapters.append(self.search_manifest_provider)
+        if self.firecrawl_provider is not None and getattr(self.firecrawl_provider, "enabled", False):
             adapters.append(self.firecrawl_provider)
         if getattr(self.serpapi_provider, "enabled", False):
             adapters.append(self.serpapi_provider)
@@ -417,10 +443,13 @@ class HybridPublicDiscoveryProvider(EvidenceIntakeProvider):
 
     def _fetch_provider_for_result(self, result: SearchResult) -> Any:
         if (
-            getattr(self.firecrawl_provider, "enabled", False)
+            self.firecrawl_provider is not None
+            and getattr(self.firecrawl_provider, "enabled", False)
             and str(result.source_name).casefold().startswith("firecrawl")
         ):
             return self.firecrawl_provider
+        if getattr(self.web_fetch_provider, "enabled", True):
+            return self.web_fetch_provider
         return self.public_provider
 
     def _safe_geocode(self, query: str) -> GeocodeResult | None:
@@ -472,6 +501,8 @@ class HybridPublicDiscoveryProvider(EvidenceIntakeProvider):
         )
 
     def _sync_firecrawl_stats(self, stats: HybridDiscoveryStats) -> None:
+        if self.firecrawl_provider is None:
+            return
         provider_stats = getattr(self.firecrawl_provider, "stats", None)
         if provider_stats is None:
             return
@@ -641,3 +672,15 @@ def _numeric_value(text: str) -> float:
     if not match:
         return 0
     return float(match.group(0).replace(",", ""))
+
+
+def _manifest_paths_from_env() -> list[str]:
+    value = os.getenv("ISITE2_SEARCH_MANIFEST_PATHS", "")
+    return [part.strip() for part in value.replace(";", ",").split(",") if part.strip()]
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().casefold() in {"1", "true", "yes", "on"}

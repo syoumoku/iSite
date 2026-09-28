@@ -52,6 +52,48 @@ def test_audit_log_flushes_search_results_immediately(tmp_path) -> None:
     assert results[0]["title"] == "Airport annual traffic"
 
 
+def test_property_id_file_supports_newline_and_json(tmp_path) -> None:
+    newline_path = tmp_path / "ids.txt"
+    newline_path.write_text("# comment\nproperty-1\n\nproperty-2\n", encoding="utf-8")
+    json_path = tmp_path / "ids.json"
+    json_path.write_text(json.dumps(["property-3", "property-4"]), encoding="utf-8")
+
+    assert backfill._load_property_ids(str(newline_path)) == {"property-1", "property-2"}
+    assert backfill._load_property_ids(str(json_path)) == {"property-3", "property-4"}
+
+
+def test_russia_queries_prefer_scene_specific_local_directories() -> None:
+    queries = backfill._queries_for_property(
+        {
+            "country": "Russia",
+            "city": "Moscow",
+            "canonical_name": "Aviapark",
+            "scene_type": "mall_mixed_use",
+        }
+    )
+
+    assert queries[0] == "Aviapark Moscow site:shopandmall.ru арендопригодная площадь"
+    assert any("пассажиропоток" in query or "арендопригодная" in query for query in queries)
+
+
+def test_ambiguous_short_mall_name_skips_broad_or_fallback() -> None:
+    prop = {
+        "country": "Russia",
+        "city": "Saint Petersburg",
+        "canonical_name": "5 ozer",
+        "scene_type": "mall_mixed_use",
+    }
+
+    assert not backfill._unsafe_broad_firecrawl_query(
+        prop,
+        "5 ozer Saint Petersburg site:shopandmall.ru арендопригодная площадь",
+    )
+    assert backfill._unsafe_broad_firecrawl_query(
+        prop,
+        "5 ozer Russia gross leasable area OR GLA OR annual footfall",
+    )
+
+
 def test_audit_state_recovers_saved_page_without_refetch(tmp_path) -> None:
     page = FetchedPage(
         source_url="https://airport.example/report",
@@ -201,8 +243,54 @@ def test_mall_metric_rejects_similar_named_wrong_property() -> None:
     assert backfill._best_extraction(prop, wrong_mall_page) is None
 
 
+def test_same_name_stadium_requires_page_location_identity() -> None:
+    prop = {
+        "canonical_name": "Estadio Monumental",
+        "country": "Chile",
+        "city": "Santiago",
+        "scene_type": "stadium",
+    }
+    wrong_country_page = FetchedPage(
+        source_url="https://en.wikipedia.org/wiki/Estadio_Monumental_(Buenos_Aires)",
+        source_name="Wikipedia",
+        source_tier=SourceTier.TIER_3,
+        content_text=(
+            "Estadio Monumental, Buenos Aires, Argentina. "
+            "The stadium has a capacity of 68,000 spectators. "
+            "Some international matches against Chile are listed in the article history."
+        ),
+    )
+
+    assert backfill._best_extraction(prop, wrong_country_page) is None
+
+
+def test_ai_aggregator_page_is_not_hard_evidence_source() -> None:
+    prop = {
+        "canonical_name": "Stade Henri Sylvoz",
+        "country": "Gabon",
+        "city": "Moanda",
+        "scene_type": "stadium",
+    }
+    page = FetchedPage(
+        source_url="https://grokipedia.com/page/stade_henri_sylvoz",
+        source_name="grokipedia.com",
+        source_tier=SourceTier.TIER_3,
+        content_text=(
+            "Stade Henri Sylvoz is a stadium in Moanda, Gabon. "
+            "The venue has a total capacity of 9,500 spectators."
+        ),
+    )
+
+    assert backfill._best_extraction(prop, page) is None
+
+
 def test_tiny_gla_fragment_is_not_hard_primary_metric() -> None:
     assert not backfill._plausible("mall_mixed_use", "gla", "8.3 sqm")
+
+
+def test_stadium_seat_count_rejects_local_seating_fragments() -> None:
+    assert not backfill._plausible("stadium", "seat_count", "750 seats")
+    assert backfill._plausible("stadium", "seat_count", "20,000 spectators")
 
 
 def test_quarter_chart_value_is_not_annual_airport_metric() -> None:
@@ -219,3 +307,166 @@ def test_quarter_chart_value_is_not_annual_airport_metric() -> None:
             "Q1 116,103 + Q2 104,660 + Q3 112,504 + Q4 120,208 = 453,475 passengers."
         ),
     )
+
+
+def test_russian_metric_values_are_plausible_and_scaled() -> None:
+    assert backfill._plausible(
+        "airport_terminal",
+        "annual_passenger_throughput",
+        "28,4 млн пассажиров",
+    )
+    assert backfill._plausible("stadium", "seat_count", "68 000 зрителей")
+    assert backfill._plausible("stadium", "seat_count", "63 145 зрительских мест")
+    assert backfill._plausible("mall_mixed_use", "gla", "90 000 кв. м")
+    assert backfill._annual_visits_from_value(
+        "annual_passenger_throughput",
+        "28,4 млн пассажиров",
+    ) == 28_400_000
+
+
+def test_hotel_room_metric_rejects_review_fragments() -> None:
+    assert backfill._plausible(
+        "luxury_hotel_mice",
+        "keys",
+        "410 уютных стильных номеров",
+    )
+    assert not backfill._plausible(
+        "luxury_hotel_mice",
+        "keys",
+        "46 Отличное обслуживание хорошие номера",
+    )
+    assert not backfill._plausible(
+        "luxury_hotel_mice",
+        "keys",
+        "49 Poor 28 Terrible 39 Rooms",
+    )
+
+
+def test_tripadvisor_is_not_hard_evidence_source() -> None:
+    page = FetchedPage(
+        source_url="https://www.tripadvisor.com/Hotel_Review-example",
+        source_name="tripadvisor.com",
+        source_tier=SourceTier.TIER_3,
+        content_text="The hotel has 410 rooms.",
+    )
+    assert backfill._low_value_evidence_source(page)
+
+
+def test_hotel_room_count_must_be_near_target_property_on_multi_hotel_page() -> None:
+    prop = {
+        "canonical_name": "InterContinental Moscow Tverskaya",
+        "country": "Russia",
+        "city": "Moscow",
+        "scene_type": "luxury_hotel_mice",
+    }
+    page = FetchedPage(
+        source_url="https://ru.hotel.report/promotion/intercontinental-history",
+        source_name="ru.hotel.report",
+        source_tier=SourceTier.TIER_2,
+        content_text=(
+            "Crowne Plaza Moscow World Trade Center (575 номеров) opened first. "
+            "The next project was InterContinental Moscow Tverskaya (205 номеров), "
+            "located in Moscow, Russia."
+        ),
+    )
+
+    extraction = backfill._best_extraction(prop, page)
+
+    assert extraction is not None
+    assert extraction.field_value == "205 номеров"
+
+
+def test_russian_property_and_location_identity_match_after_transliteration() -> None:
+    prop = {
+        "canonical_name": "Aviapark",
+        "country": "Russia",
+        "city": "Moscow",
+        "scene_type": "mall_mixed_use",
+    }
+    page = FetchedPage(
+        source_url="https://example.ru/aviapark",
+        source_name="example.ru",
+        source_tier=SourceTier.TIER_2,
+        content_text=(
+            "ТРЦ Авиапарк расположен в Москве, Россия. "
+            "Арендопригодная площадь комплекса составляет 230 000 кв. м."
+        ),
+    )
+
+    extraction = backfill._best_extraction(prop, page)
+
+    assert extraction is not None
+    assert extraction.field_group == "gla"
+
+
+def test_russian_romanization_variant_matches_property_identity() -> None:
+    assert backfill._mentions_property(
+        "Akademicheskaya Metro Station",
+        "Станция метро Академическая расположена в Москве, Россия.",
+    )
+    assert backfill._mentions_property(
+        "Tsentralnyy stadion Dinamo im. Lva Yashina",
+        "VTB Arena - Central Stadium Dynamo named after Lev Yashin, Moscow, Russia.",
+    )
+    assert backfill._mentions_city("Saint Petersburg", "Санкт-Петербург, Россия")
+
+
+def test_single_property_factsheet_allows_capacity_table_without_repeated_name() -> None:
+    prop = {
+        "canonical_name": "Tsentralnyy stadion Dinamo im. Lva Yashina",
+        "country": "Russia",
+        "city": "Moscow",
+        "scene_type": "stadium",
+    }
+    page = FetchedPage(
+        source_url="https://stadiumdb.com/stadiums/rus/vtb_arena",
+        source_name="stadiumdb.com",
+        source_tier=SourceTier.TIER_3,
+        content_text=(
+            "VTB Arena - Central Stadium Dynamo named after Lev Yashin, Moscow, Russia.\n"
+            "| Capacity | 25 716 |"
+        ),
+    )
+
+    extraction = backfill._best_extraction(prop, page)
+
+    assert extraction is not None
+    assert extraction.field_group == "seat_count"
+    assert extraction.field_value == "Capacity | 25 716"
+
+
+def test_render_report_handles_skipped_low_evidence_labels() -> None:
+    summary = {
+        "gap_summary_before": {
+            "scene_summary": {
+                "stadium": {
+                    "hard_primary_metric_properties": 1,
+                    "total": 2,
+                    "low_primary_metric_evidence_properties": 1,
+                }
+            }
+        },
+        "gap_summary_after": {
+            "scene_summary": {
+                "stadium": {
+                    "hard_primary_metric_properties": 1,
+                    "total": 2,
+                    "low_primary_metric_evidence_properties": 1,
+                }
+            }
+        },
+        "searches_used": 1,
+        "max_searches": 10,
+        "audit_log_path": "events.jsonl",
+        "reused_search_result_sets": 0,
+        "reused_pages": 0,
+        "draft_count": 0,
+        "drafts_by_scene": {},
+        "raw_evidence_written_or_changed": 0,
+        "labels": {"skipped": "no_overlay_sync"},
+        "search_log_path": "search.jsonl",
+    }
+
+    report = backfill._render_report(summary)
+
+    assert "Low evidence labels: no_overlay_sync" in report

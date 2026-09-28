@@ -1,9 +1,21 @@
 version: "0.1"
 checks:
+  - key: qa_lessons_learned_read
+    description: 是否已加载 config/qa_controls.yaml 和精炼的 docs/15_qa_lessons_learned.md，并执行适用的自动控制与人工 artifact 门
   - key: scan_boundary_defined
     description: 是否明确扫描边界
+  - key: country_localization_profile_documented
+    description: 是否在 live search/Firecrawl 前留存国家本地化 profile，包含官方语言、实际搜索语言优先级、主要搜索引擎/搜索渠道、本地域名和本地指标术语
+  - key: localized_search_artifacts_retained
+    description: 是否保存本地语言 search artifact/manifest，且每条记录包含 language、search_channel、query、采纳/跳过原因
+  - key: local_language_before_english
+    description: 是否先用官方/本地语言和本地渠道搜索证据，英文或国际目录仅作为失败兜底或交叉验证并留痕
   - key: full_scan_not_truncated
     description: 是否按“全量扫描不设上限”执行
+  - key: incremental_scene_balance
+    description: 是否按国家现有场景缺口分配新增配额，单一场景未占本轮新增的 50% 及以上，且酒店未挤占交通、会展、商场、体育、办公和机场场景
+  - key: active_candidate_real_image_required
+    description: 是否所有拟进入 active 的新增候选都有经 HTTP 与实体一致性验证的真实物业图片；缺图候选仅保留在线索层或 Review Queue
   - key: entity_gate_passed
     description: 是否所有点先过实体门
   - key: evidence_gate_passed
@@ -30,3 +42,7 @@ checks:
     description: 复核项是否写具体动作
   - key: output_contract_matched
     description: 输出形式是否符合固定模板
+  - key: standard_report_ppt_excel_metric_consistency
+    description: 标准报告 PPT 第二页推荐点指标值是否与同包 Excel 推荐清单“门槛指标值”逐条一致
+  - key: post_output_gpt_audit_passed
+    description: Excel/PPT 文档产出后是否已通过 Codex OAuth GPT 审计；未通过时不得打包、发送或对外交付

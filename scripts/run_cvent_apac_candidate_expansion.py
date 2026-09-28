@@ -14,6 +14,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from bs4 import BeautifulSoup
+
 from isite2.growth.evidence_curation import run_pending_evidence_curation
 from isite2.growth.evidence_intake import (
     CandidateDraft,
@@ -35,7 +37,7 @@ DB_URL = f"sqlite+pysqlite:///{DB_PATH}"
 OUTPUT_DIR = Path("outputs") / "regional_scan_loop"
 INPUT_DIR = Path(".firecrawl") / "apac_50"
 SOURCE_TYPE = "cvent_candidate_expansion"
-SOURCE_DATE = "2026-05-19"
+SOURCE_DATE = datetime.now().date().isoformat()
 USER_AGENT = "isite2-codex/0.1 public evidence geocoding"
 
 COUNTRIES = ["Sri Lanka", "Cambodia", "Maldives"]
@@ -48,6 +50,25 @@ COUNTRY_META = {
     "Ecuador": {"slug": "ecuador", "cc": "EC", "osm_cc": "ec"},
     "Colombia": {"slug": "colombia", "cc": "CO", "osm_cc": "co"},
     "Philippines": {"slug": "philippines", "cc": "PH", "osm_cc": "ph"},
+    "Madagascar": {"slug": "madagascar", "cc": "MG", "osm_cc": "mg"},
+    "Morocco": {"slug": "morocco", "cc": "MA", "osm_cc": "ma"},
+    "Vietnam": {"slug": "vietnam", "cc": "VN", "osm_cc": "vn"},
+    "Nigeria": {"slug": "nigeria", "cc": "NG", "osm_cc": "ng"},
+    "South Africa": {"slug": "south_africa", "cc": "ZA", "osm_cc": "za"},
+    "Kenya": {"slug": "kenya", "cc": "KE", "osm_cc": "ke"},
+    "Ghana": {"slug": "ghana", "cc": "GH", "osm_cc": "gh"},
+    "Tanzania": {"slug": "tanzania", "cc": "TZ", "osm_cc": "tz"},
+    "Uganda": {"slug": "uganda", "cc": "UG", "osm_cc": "ug"},
+    "Botswana": {"slug": "botswana", "cc": "BW", "osm_cc": "bw"},
+    "Zimbabwe": {"slug": "zimbabwe", "cc": "ZW", "osm_cc": "zw"},
+    "Namibia": {"slug": "namibia", "cc": "NA", "osm_cc": "na"},
+    "Angola": {"slug": "angola", "cc": "AO", "osm_cc": "ao"},
+    "Mozambique": {"slug": "mozambique", "cc": "MZ", "osm_cc": "mz"},
+    "United Arab Emirates": {
+        "slug": "united_arab_emirates",
+        "cc": "AE",
+        "osm_cc": "ae",
+    },
 }
 
 COUNTRY_REGION = {
@@ -59,6 +80,21 @@ COUNTRY_REGION = {
     "Ecuador": "Latin America",
     "Colombia": "Latin America",
     "Philippines": "Asia Pacific",
+    "Madagascar": "Africa",
+    "Morocco": "Africa",
+    "Vietnam": "Asia Pacific",
+    "Nigeria": "Africa",
+    "South Africa": "Africa",
+    "Kenya": "Africa",
+    "Ghana": "Africa",
+    "Tanzania": "Africa",
+    "Uganda": "Africa",
+    "Botswana": "Africa",
+    "Zimbabwe": "Africa",
+    "Namibia": "Africa",
+    "Angola": "Africa",
+    "Mozambique": "Africa",
+    "United Arab Emirates": "Middle East",
 }
 
 PLACEHOLDER_IMAGE_TOKENS = (
@@ -81,6 +117,8 @@ class CventVenue:
     hero_source_name: str
     source_file: str
     metric_text: str
+    latitude: float | None = None
+    longitude: float | None = None
 
 
 def main() -> None:
@@ -88,6 +126,12 @@ def main() -> None:
         description="Convert saved Cvent APAC venue pages into iSite2 candidate drafts."
     )
     parser.add_argument("--countries", nargs="+", default=COUNTRIES)
+    parser.add_argument(
+        "--cities",
+        nargs="+",
+        default=None,
+        help="Optional city allow-list for scoped sweeps; values are matched case-insensitively.",
+    )
     parser.add_argument("--target-ready-per-country", type=int, default=50)
     parser.add_argument("--overfill-margin", type=int, default=8)
     parser.add_argument("--input-dir", type=Path, default=INPUT_DIR)
@@ -98,6 +142,11 @@ def main() -> None:
     )
     parser.add_argument("--skip-sync", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--require-room-count",
+        action="store_true",
+        help="Accept hotel candidates only when Cvent publishes a numeric guest-room count.",
+    )
     args = parser.parse_args()
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -120,6 +169,7 @@ def main() -> None:
     parsed: list[CventVenue] = []
     for country in args.countries:
         parsed.extend(_parse_country(country, args.input_dir, hero_index))
+    city_filter = {_city_filter_key(city) for city in args.cities or []}
 
     selected: list[CandidateDraft] = []
     invalid: list[dict[str, Any]] = []
@@ -128,6 +178,9 @@ def main() -> None:
     seen_identity_keys: set[str] = set()
 
     for venue in _rank_venues(parsed):
+        if city_filter and _city_filter_key(venue.city) not in city_filter:
+            skipped["city_not_in_scope"] += 1
+            continue
         needed = max(args.target_ready_per_country - current_ready.get(venue.country, 0), 0)
         cap = needed + args.overfill_margin
         if cap <= 0:
@@ -138,6 +191,12 @@ def main() -> None:
             continue
         if "/cvb/" in venue.source_url or not _is_property_venue(venue):
             skipped["non_property_venue"] += 1
+            continue
+        if _is_future_opening(venue.property_name):
+            skipped["future_opening"] += 1
+            continue
+        if args.require_room_count and venue.rooms <= 0:
+            skipped["room_count_missing"] += 1
             continue
         if venue.rooms <= 0 and venue.meeting_space_sqft < 500:
             skipped["metric_missing"] += 1
@@ -157,7 +216,13 @@ def main() -> None:
             skipped["known_source_url"] += 1
             continue
 
-        geocode = geocoder.geocode(venue)
+        if venue.latitude is not None and venue.longitude is not None:
+            if not geocoder._within_country(venue.country, venue.latitude, venue.longitude):
+                skipped["embedded_coordinate_out_of_bbox"] += 1
+                continue
+            geocode = {"latitude": venue.latitude, "longitude": venue.longitude}
+        else:
+            geocode = geocoder.geocode(venue)
         if geocode is None:
             skipped["geocode_failed_or_out_of_bbox"] += 1
             continue
@@ -215,6 +280,7 @@ def main() -> None:
         "mode": SOURCE_TYPE,
         "timestamp_utc": datetime.now(UTC).isoformat(),
         "countries": args.countries,
+        "cities": args.cities or [],
         "target_ready_per_country": args.target_ready_per_country,
         "current_ready_before": current_ready,
         "current_ready_after": final_ready,
@@ -278,10 +344,9 @@ class NominatimGeocoder:
 
     def geocode(self, venue: CventVenue) -> dict[str, float] | None:
         meta = COUNTRY_META[venue.country]
-        queries = [
-            f"{venue.property_name}, {venue.city}, {venue.country}",
-            f"{venue.property_name}, {venue.country}",
-        ]
+        queries = [f"{venue.property_name}, {venue.city}, {venue.country}"]
+        if not venue.city:
+            queries = [f"{venue.property_name}, {venue.country}"]
         for query in queries:
             query = re.sub(r"\s+", " ", query).strip(", ")
             if not query:
@@ -355,7 +420,7 @@ def _parse_country(country: str, input_dir: Path, hero_index: dict[str, str]) ->
     for path in sorted(input_dir.glob(f"cvent_{meta['slug']}*.json")):
         data = json.loads(path.read_text(encoding="utf-8"))
         markdown = data.get("markdown") or data.get("data", {}).get("markdown") or ""
-        for entry in re.split(r"\n- \[", markdown)[1:]:
+        for entry in re.split(r"\n(?:-\s+|\*\s+)\[", markdown)[1:]:
             venue = _parse_entry(
                 country=country,
                 country_code=meta["cc"],
@@ -369,7 +434,134 @@ def _parse_country(country: str, input_dir: Path, hero_index: dict[str, str]) ->
                 continue
             seen_urls.add(venue.source_url)
             venues.append(venue)
+    for path in sorted(input_dir.glob(f"cvent_{meta['slug']}*.html")):
+        for venue in _parse_html_page(
+            country=country,
+            country_code=meta["cc"],
+            html_text=path.read_text(encoding="utf-8", errors="ignore"),
+            source_file=str(path),
+        ):
+            if venue.source_url in seen_urls:
+                continue
+            seen_urls.add(venue.source_url)
+            venues.append(venue)
     return venues
+
+
+def _parse_html_page(
+    *,
+    country: str,
+    country_code: str,
+    html_text: str,
+    source_file: str,
+) -> list[CventVenue]:
+    soup = BeautifulSoup(html_text, "html.parser")
+    coordinates = _html_coordinates(soup)
+    venues: list[CventVenue] = []
+    seen_urls: set[str] = set()
+    for anchor in soup.find_all("a", href=True):
+        source_url = str(anchor.get("href") or "")
+        source_url = source_url.split("?", 1)[0]
+        if "/venue-" not in source_url or source_url in seen_urls:
+            continue
+        metadata = anchor.find(attrs={"title": re.compile(rf",\s*{country_code}\s*\|")})
+        if metadata is None:
+            continue
+        match = re.match(
+            rf"(.+?),\s*{re.escape(country_code)}\s*\|\s*([^|]+)",
+            str(metadata.get("title") or ""),
+        )
+        if match is None:
+            continue
+        city = match.group(1).strip()
+        venue_type = match.group(2).strip()
+        image = anchor.find("img")
+        if image is None:
+            parent = anchor.parent
+            for _ in range(4):
+                if parent is None:
+                    break
+                image = parent.find("img")
+                if image is not None:
+                    break
+                parent = parent.parent
+        image_alt = str(image.get("alt") or "").strip() if image else ""
+        property_name = re.sub(
+            rf"\s+in\s+{re.escape(city)},\s*{re.escape(country_code)}$",
+            "",
+            image_alt,
+            flags=re.IGNORECASE,
+        ).strip()
+        if not property_name:
+            slug = source_url.split("/venue-", 1)[0].rstrip("/").rsplit("/", 1)[-1]
+            property_name = re.sub(r"[-_]+", " ", slug).title()
+
+        raw = re.sub(r"\s+", " ", anchor.get_text(" ", strip=True))
+        metric_text = _metric_text(raw)
+        rooms, meeting_space_sqft = _metrics(metric_text)
+        hero_url = ""
+        if image:
+            hero_url = str(image.get("src") or "").strip()
+            if not hero_url:
+                srcset = str(image.get("srcset") or "")
+                hero_url = srcset.split(",")[-1].strip().split(" ")[0] if srcset else ""
+            hero_url = _cvent_image_url(hero_url)
+        seen_urls.add(source_url)
+        coordinate = coordinates.get(source_url) or coordinates.get(property_name.casefold()) or {}
+        venues.append(
+            CventVenue(
+                country=country,
+                city=city,
+                property_name=property_name,
+                venue_type=venue_type,
+                source_url=source_url,
+                rooms=rooms,
+                meeting_space_sqft=meeting_space_sqft,
+                hero_url=hero_url or None,
+                hero_source_name="Cvent Supplier Network",
+                source_file=source_file,
+                metric_text=metric_text,
+                latitude=coordinate.get("latitude"),
+                longitude=coordinate.get("longitude"),
+            )
+        )
+    return venues
+
+
+def _cvent_image_url(value: str) -> str:
+    if value.startswith(("http://", "https://")) and "/_next/image?" not in value:
+        return value
+    parsed = urllib.parse.urlparse(value)
+    target = urllib.parse.parse_qs(parsed.query).get("url", [])
+    return urllib.parse.unquote(target[0]) if target else value
+
+
+def _html_coordinates(soup: BeautifulSoup) -> dict[str, dict[str, float]]:
+    coordinates: dict[str, dict[str, float]] = {}
+    for script in soup.find_all("script", attrs={"type": "application/ld+json"}):
+        try:
+            payload = json.loads(script.get_text())
+        except (TypeError, json.JSONDecodeError):
+            continue
+        if payload.get("@type") != "ItemList":
+            continue
+        for row in payload.get("itemListElement", []) or []:
+            item = row.get("item") or {}
+            geo = item.get("geo") or {}
+            try:
+                coordinate = {
+                    "latitude": float(geo["latitude"]),
+                    "longitude": float(geo["longitude"]),
+                }
+            except (KeyError, TypeError, ValueError):
+                continue
+            url = str(item.get("url") or "").split("?", 1)[0]
+            name = str(item.get("name") or "").casefold().strip()
+            if url:
+                coordinates[url] = coordinate
+            if name:
+                coordinates[name] = coordinate
+    return coordinates
 
 
 def _parse_entry(
@@ -388,23 +580,26 @@ def _parse_entry(
         return None
     source_url = urls[-1].split("?")[0]
     bolds = [item.strip() for item in re.findall(r"\*\*([^*]+)\*\*", entry) if item.strip()]
-    if not bolds:
+    heading = re.search(r"###\s+([^\\\n]+)", entry)
+    property_name = (heading.group(1).strip() if heading else (bolds[-1] if bolds else ""))
+    if not property_name:
         return None
-    property_name = bolds[-1]
 
     raw = html.unescape(entry.replace("\\", " "))
     raw_without_images = re.sub(r"!\[[^\]]*\]\([^)]*\)", " ", raw)
     raw_without_images = re.sub(r"\s+", " ", raw_without_images)
     venue_match = re.search(
-        r"\*\*([^*]+)\*\*\s+([^,]{2,80}),\s*"
+        (r"###\s+" if heading else "")
+        + re.escape(property_name)
+        + r"\s+([^,]{2,80}),\s*"
         + re.escape(country_code)
-        + r"\s*•\s*([^•\[]+)",
+        + r"\s*•\s*([^•\[]+?)(?:\s*•\s*[^•\[]+?)?\s+Select venue",
         raw,
     )
     if venue_match is None:
         return None
-    city = venue_match.group(2).strip()
-    venue_type = venue_match.group(3).strip()
+    city = venue_match.group(1).strip()
+    venue_type = venue_match.group(2).strip()
 
     metric_text = _metric_text(raw_without_images)
     rooms, meeting_space_sqft = _metrics(metric_text)
@@ -438,6 +633,8 @@ def _metric_text(entry_text: str) -> str:
 
 
 def _metrics(metric_text: str) -> tuple[int, int]:
+    metric_text = re.sub(r"\b\d(?:\.\d)?\s+out of\s+5\b", " ", metric_text, flags=re.I)
+    metric_text = re.sub(r"\b\d+(?:\.\d+)?\s+mi\b", " ", metric_text, flags=re.I)
     space_values = [
         int(value.replace(",", ""))
         for value in re.findall(r"(\d[\d,]*)\s*sq\.\s*ft", metric_text, re.I)
@@ -457,9 +654,9 @@ def _metrics(metric_text: str) -> tuple[int, int]:
         for number in numbers
         if number not in {1, 2, 3, 4, 5} and not 1900 <= number <= 2035
     ]
-    plausible_rooms = [number for number in numbers if 20 <= number <= 1500]
+    plausible_rooms = [number for number in numbers if 20 <= number <= 3000]
     rooms = 0
-    if len(plausible_rooms) >= 2 and plausible_rooms[0] <= 30 and plausible_rooms[1] >= 40:
+    if len(plausible_rooms) >= 2 and plausible_rooms[0] <= 100 and plausible_rooms[1] >= 100:
         rooms = plausible_rooms[1]
     elif plausible_rooms:
         rooms = plausible_rooms[0]
@@ -544,7 +741,12 @@ def _draft_from_venue(
     geocode: dict[str, float],
     registry: dict[str, Any],
 ) -> CandidateDraft:
-    if venue.rooms > 0:
+    if scene_type == "convention_center" and venue.meeting_space_sqft > 0:
+        field_group = "meeting_ballroom_area"
+        indicator_name = "meeting_ballroom_area"
+        field_value = f"Cvent lists event or meeting space up to {venue.meeting_space_sqft:,} sq. ft."
+        annual_visits = float(max(venue.meeting_space_sqft * 20, 25_000))
+    elif venue.rooms > 0:
         field_group = "keys"
         indicator_name = "keys"
         field_value = f"Cvent lists {venue.rooms:,} guest rooms for the venue."
@@ -608,6 +810,20 @@ def _content_text(venue: CventVenue) -> str:
 
 def _scene_type(venue: CventVenue) -> str:
     text = f"{venue.venue_type} {venue.source_url}".casefold()
+    if any(
+        token in text
+        for token in (
+            "/hotel/",
+            "/resort/",
+            "/boutique-hotel/",
+            "/luxury-hotel/",
+            "hotel",
+            "resort",
+            "boutique hotel",
+            "luxury hotel",
+        )
+    ):
+        return "luxury_hotel_mice"
     if any(token in text for token in ("convention", "conference", "exhibition")):
         return "convention_center"
     return "luxury_hotel_mice"
@@ -639,11 +855,23 @@ def _is_property_venue(venue: CventVenue) -> bool:
     )
 
 
+def _is_future_opening(property_name: str) -> bool:
+    lowered = property_name.casefold()
+    if not any(token in lowered for token in ("open for", "opening", "opens")):
+        return False
+    years = [int(value) for value in re.findall(r"\b20\d{2}\b", property_name)]
+    return any(year > datetime.now().year for year in years)
+
+
 def _city_from_url(source_url: str) -> str:
     match = re.search(r"/en-US/([^/]+)/", source_url)
     if not match:
         return ""
     return match.group(1).replace("-", " ").title()
+
+
+def _city_filter_key(city: str) -> str:
+    return re.sub(r"\s+", " ", city or "").strip().casefold()
 
 
 def _venue_type_from_url(source_url: str) -> str:

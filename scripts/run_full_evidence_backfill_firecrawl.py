@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import argparse
+import difflib
 import hashlib
 import json
 import os
 import re
 import sqlite3
 import subprocess
+import sys
+import unicodedata
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -16,10 +19,13 @@ from uuid import uuid4
 from isite2.connectors.extraction import extract_indicators
 from isite2.connectors.firecrawl import FirecrawlPublicEvidenceProvider, firecrawl_subprocess_env
 from isite2.connectors.models import FetchedPage, SearchResult
+from isite2.connectors.scrapling import ScraplingPublicEvidenceProvider
+from isite2.connectors.web import PageFetchProvider, SearchManifestProvider, SearchProvider
 from isite2.domain.enums import SourceTier
 from isite2.growth.evidence_curation import run_pending_evidence_curation
 from isite2.growth.evidence_intake import CandidateDraft, load_effective_source_registry
 from isite2.growth.evidence_store import EvidenceCurationStore
+from isite2.growth.localized_search_strategy import build_localized_queries
 from isite2.growth.overlay_sync import sync_overlay_to_active_repository
 from isite2.growth.property_identity import KNOWN_PROPERTY
 from isite2.growth.regional_targets import REGION_COUNTRIES
@@ -31,8 +37,10 @@ DB_PATH = Path("outputs/isite2_dev.db")
 DB_URL = f"sqlite+pysqlite:///{DB_PATH}"
 OUTPUT_DIR = Path("outputs") / "regional_scan_loop"
 FIRECRAWL_DIR = Path(".firecrawl") / "full_evidence_backfill_20260513"
+WEB_EVIDENCE_DIR = Path(".web_evidence") / "full_evidence_backfill"
 SOURCE_TYPE = "firecrawl_full_evidence_backfill"
-TODAY = "2026-05-13"
+SCRAPLING_SOURCE_TYPE = "scrapling_full_evidence_backfill"
+TODAY = datetime.now(UTC).date().isoformat()
 LOW_EVIDENCE_LABEL = "low_primary_metric_evidence"
 HARD_EVIDENCE_LABEL = "hard_primary_metric_available"
 AUDIT_EVENT_VERSION = 1
@@ -60,6 +68,16 @@ HARD_PRIMARY: dict[str, list[str]] = {
     "university": ["enrollment", "students", "student_count", "campus_population"],
     "transport_hub": ["daily_ridership", "ridership", "interchange_volume", "line_count"],
     "cruise_port": ["passenger_throughput", "annual_passenger_throughput"],
+    "mosque": [
+        "mosque_area",
+        "gross_floor_area",
+        "prayer_hall_area",
+        "annual_visitors",
+        "annual_visits",
+        "daily_visitors",
+        "annual_footfall",
+        "footfall",
+    ],
 }
 
 QUERY_TEMPLATES: dict[str, list[str]] = {
@@ -99,6 +117,55 @@ QUERY_TEMPLATES: dict[str, list[str]] = {
         "{property_name} daily ridership passengers",
         "{property_name} line count platforms",
     ],
+    "mosque": [
+        "{property_name} mosque area visitors official",
+        "{property_name} masjid area annual visitors",
+        "{property_name} مساحة المسجد عدد الزوار",
+    ],
+}
+
+COUNTRY_QUERY_TEMPLATES: dict[str, dict[str, list[str]]] = {
+    "Russia": {
+        "stadium": [
+            "{property_name} {city} site:stadiumdb.com capacity",
+            "{property_name} {city} вместимость стадион",
+        ],
+        "convention_center": [
+            "{property_name} {city} site:ruef.ru выставочная площадь",
+            "{property_name} {city} выставочная площадь павильонов",
+        ],
+        "mall_mixed_use": [
+            "{property_name} {city} site:shopandmall.ru арендопригодная площадь",
+            "{property_name} {city} site:malls.ru GLA",
+            "{property_name} {city} арендопригодная площадь посещаемость",
+        ],
+        "luxury_hotel_mice": [
+            "{property_name} {city} официальный количество номеров конференц-залы",
+            "{property_name} {city} site:101hotels.com количество номеров",
+            "{property_name} {city} rooms meeting space official",
+        ],
+        "transport_hub": [
+            "{property_name} {city} пассажиропоток станция метро",
+            "{property_name} {city} site:mosmetro.ru пассажиропоток",
+            "{property_name} {city} site:metro.spb.ru пассажиропоток",
+        ],
+        "airport_terminal": [
+            "{property_name} {city} пассажиропоток аэропорт официальный",
+            "{property_name} {city} airport passenger traffic official",
+        ],
+        "hospital": [
+            "{property_name} {city} коек официальный",
+            "{property_name} {city} количество коек",
+        ],
+        "university": [
+            "{property_name} {city} численность студентов официальный",
+            "{property_name} {city} обучающихся студентов",
+        ],
+        "office_government": [
+            "{property_name} {city} офисная площадь бизнес-центр",
+            "{property_name} {city} арендопригодная площадь",
+        ],
+    }
 }
 
 SCENE_PRIORITY = {
@@ -112,12 +179,14 @@ SCENE_PRIORITY = {
     "hospital": 7,
     "university": 8,
     "cruise_port": 9,
+    "mosque": 10,
 }
 
 
 @dataclass
 class AuditLog:
     path: Path
+    source_type: str = SOURCE_TYPE
 
     def __post_init__(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -126,7 +195,7 @@ class AuditLog:
         event = {
             "event_version": AUDIT_EVENT_VERSION,
             "event_type": event_type,
-            "source_type": SOURCE_TYPE,
+            "source_type": self.source_type,
             "logged_at": datetime.now(UTC).isoformat(),
             **payload,
         }
@@ -216,34 +285,46 @@ def main() -> None:
     args = _parse_args()
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     FIRECRAWL_DIR.mkdir(parents=True, exist_ok=True)
+    WEB_EVIDENCE_DIR.mkdir(parents=True, exist_ok=True)
+    provider_mode = args.provider
+    source_type = SCRAPLING_SOURCE_TYPE if provider_mode != "firecrawl" else SOURCE_TYPE
+    run_dir = FIRECRAWL_DIR if provider_mode == "firecrawl" else WEB_EVIDENCE_DIR
     run_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     audit_log_path = (
         Path(args.audit_log_path)
         if args.audit_log_path
-        else FIRECRAWL_DIR / f"{SOURCE_TYPE}_{run_id}_events.jsonl"
+        else run_dir / f"{source_type}_{run_id}_events.jsonl"
     )
-    audit = AuditLog(audit_log_path)
-    resume_paths = [] if args.no_resume or args.force_retry else _audit_event_paths(FIRECRAWL_DIR)
+    audit = AuditLog(audit_log_path, source_type=source_type)
+    resume_paths = (
+        []
+        if args.no_resume or args.force_retry
+        else [*_audit_event_paths(run_dir), *_audit_event_paths(FIRECRAWL_DIR)]
+    )
     state = AuditState.from_event_paths(resume_paths)
-    pages_dir = FIRECRAWL_DIR / "pages"
+    pages_dir = run_dir / "pages"
     countries = _split_filter(args.countries)
     scenes = _split_filter(args.scenes)
     before = evidence_gap_summary()
-    targets = _select_targets(
-        _target_pool(
-            mode=args.target_mode,
-            countries=countries,
-            scenes=scenes,
-            min_distinct_source_urls=args.min_distinct_source_urls,
-        ),
-        args.max_properties,
+    property_ids = _load_property_ids(args.property_ids_file)
+    target_pool = _target_pool(
+        mode=args.target_mode,
+        countries=countries,
+        scenes=scenes,
+        min_distinct_source_urls=args.min_distinct_source_urls,
     )
+    if property_ids:
+        target_pool = [prop for prop in target_pool if prop["id"] in property_ids]
+    targets = _select_targets(target_pool, args.max_properties)
     store = EvidenceCurationStore(database_url=DB_URL)
     registry = load_effective_source_registry()
     drafts: list[CandidateDraft] = []
     raw_ids = []
     written_or_changed = 0
-    start_remaining = _remaining_firecrawl_credits()
+    uses_firecrawl = provider_mode == "firecrawl" or (
+        provider_mode == "auto" and args.allow_firecrawl_fallback
+    )
+    start_remaining = _remaining_firecrawl_credits() if uses_firecrawl else None
     budget_stop = False
     terminal_query_skips = 0
     reused_search_result_sets = 0
@@ -251,24 +332,29 @@ def main() -> None:
     fetched_pages = 0
     extraction_rejections = 0
     fetch_failures = 0
-    provider = FirecrawlPublicEvidenceProvider(
-        enabled=True,
-        scrape_search_results=True,
-        timeout_ms=args.timeout_ms,
-        max_attempts=1,
+    search_provider, fetch_provider = _build_backfill_providers(
+        args=args,
+        run_dir=run_dir,
+        store=store,
+        uses_firecrawl=uses_firecrawl,
     )
     audit.append(
         "run_started",
         run_id=run_id,
         max_searches=args.max_searches,
         max_properties=args.max_properties,
+        property_ids_file=args.property_ids_file,
+        property_id_filter_count=len(property_ids),
         target_mode=args.target_mode,
         countries=sorted(countries),
         scenes=sorted(scenes),
         min_distinct_source_urls=args.min_distinct_source_urls,
         result_limit=args.result_limit,
-        credit_budget=args.credit_budget,
+        provider=provider_mode,
+        source_type=source_type,
+        credit_budget=args.credit_budget if uses_firecrawl else 0,
         credit_start_remaining=start_remaining,
+        search_manifest_path=args.search_manifest_path,
         resume_enabled=not args.no_resume and not args.force_retry,
         resume_event_paths=[str(path) for path in resume_paths],
     )
@@ -317,6 +403,30 @@ def main() -> None:
                     reason="query_already_completed_or_failed",
                 )
                 continue
+            if _unsafe_broad_firecrawl_query(prop, query):
+                terminal_query_skips += 1
+                audit.append(
+                    "query_skipped_unsafe_broad_fallback",
+                    run_id=run_id,
+                    query_key=query_key,
+                    property_id=prop["id"],
+                    property_name=prop["canonical_name"],
+                    query=query,
+                    reason="ambiguous_property_name_requires_directory_or_city_constrained_query",
+                )
+                event = audit.append(
+                    "query_completed",
+                    run_id=run_id,
+                    query_key=query_key,
+                    property_id=prop["id"],
+                    property_name=prop["canonical_name"],
+                    query=query,
+                    accepted=False,
+                    result_count=0,
+                    reason="unsafe_broad_fallback_skipped",
+                )
+                state.ingest(event)
+                continue
 
             logged_results = None if args.force_retry else state.logged_search_results(query_key)
             if logged_results is not None:
@@ -337,8 +447,9 @@ def main() -> None:
                 if _budget_exhausted(
                     start_remaining=start_remaining,
                     budget=args.credit_budget,
-                    request_count=provider.stats.search_requests + provider.stats.scrape_requests,
+                    request_count=_provider_request_count(search_provider, fetch_provider),
                     check_interval=1,
+                    enabled=uses_firecrawl,
                 ):
                     budget_stop = True
                     audit.append(
@@ -350,7 +461,7 @@ def main() -> None:
                         query=query,
                         credit_budget=args.credit_budget,
                         credit_start_remaining=start_remaining,
-                        credit_remaining=_remaining_firecrawl_credits(),
+                        credit_remaining=_remaining_firecrawl_credits() if uses_firecrawl else None,
                     )
                     break
                 audit.append(
@@ -365,11 +476,9 @@ def main() -> None:
                     result_limit=args.result_limit,
                 )
                 try:
-                    results = provider.search(
+                    results = search_provider.search(
                         query,
                         limit=args.result_limit,
-                        country="",
-                        location=prop["country"],
                     )
                 except Exception as exc:  # pragma: no cover - live provider guardrail
                     event = audit.append(
@@ -397,14 +506,15 @@ def main() -> None:
                     query=query,
                     result_count=len(results),
                     results=[_search_result_payload(result) for result in results],
-                    firecrawl_stats=_provider_stats(provider),
+                    provider_stats=_provider_stats(search_provider, fetch_provider),
                 )
                 state.ingest(event)
                 if _budget_exhausted(
                     start_remaining=start_remaining,
                     budget=args.credit_budget,
-                    request_count=provider.stats.search_requests + provider.stats.scrape_requests,
+                    request_count=_provider_request_count(search_provider, fetch_provider),
                     check_interval=args.credit_check_interval,
+                    enabled=uses_firecrawl,
                 ):
                     budget_stop = True
                     audit.append(
@@ -416,7 +526,7 @@ def main() -> None:
                         query=query,
                         credit_budget=args.credit_budget,
                         credit_start_remaining=start_remaining,
-                        credit_remaining=_remaining_firecrawl_credits(),
+                        credit_remaining=_remaining_firecrawl_credits() if uses_firecrawl else None,
                     )
             for result in results:
                 if budget_stop:
@@ -441,8 +551,9 @@ def main() -> None:
                     if _budget_exhausted(
                         start_remaining=start_remaining,
                         budget=args.credit_budget,
-                        request_count=provider.stats.search_requests + provider.stats.scrape_requests,
+                        request_count=_provider_request_count(search_provider, fetch_provider),
                         check_interval=1,
+                        enabled=uses_firecrawl,
                     ):
                         budget_stop = True
                         audit.append(
@@ -455,7 +566,7 @@ def main() -> None:
                             url=str(result.url),
                             credit_budget=args.credit_budget,
                             credit_start_remaining=start_remaining,
-                            credit_remaining=_remaining_firecrawl_credits(),
+                            credit_remaining=_remaining_firecrawl_credits() if uses_firecrawl else None,
                         )
                         break
                     audit.append(
@@ -469,7 +580,7 @@ def main() -> None:
                         title=result.title,
                     )
                     try:
-                        page = provider.fetch_page(str(result.url))
+                        page = fetch_provider.fetch_page(str(result.url))
                     except Exception as exc:  # pragma: no cover - live provider guardrail
                         fetch_failures += 1
                         audit.append(
@@ -493,7 +604,7 @@ def main() -> None:
                         query=query,
                         url=str(result.url),
                         **_persist_fetched_page(page, pages_dir),
-                        firecrawl_stats=_provider_stats(provider),
+                        provider_stats=_provider_stats(search_provider, fetch_provider),
                     )
                     state.ingest(event)
                 extraction = _best_extraction(prop, page)
@@ -511,9 +622,15 @@ def main() -> None:
                         reason="no_plausible_hard_primary_metric",
                     )
                     continue
-                draft = _draft_for_existing(prop, extraction, page.content_text, registry)
+                draft = _draft_for_existing(
+                    prop,
+                    extraction,
+                    page.content_text,
+                    registry,
+                    source_type=source_type,
+                )
                 drafts.append(draft)
-                write_result = store.upsert_candidate_evidence(draft, source_type=SOURCE_TYPE)
+                write_result = store.upsert_candidate_evidence(draft, source_type=source_type)
                 raw_ids.append(write_result.raw_evidence_id)
                 if write_result.is_new_evidence or write_result.is_changed_evidence:
                     written_or_changed += 1
@@ -570,24 +687,31 @@ def main() -> None:
         repository = SQLAlchemyScanRunRepository.from_url(DB_URL, storage_mode="sqlite")
         sync = sync_overlay_to_active_repository(repository)
 
-    labels = apply_low_evidence_labels(
-        scan_run_id=str(sync.run_id) if sync and sync.run_id else None
+    labels = (
+        apply_low_evidence_labels(scan_run_id=str(sync.run_id))
+        if sync and sync.run_id
+        else {"skipped": "no_overlay_sync"}
     )
     after = evidence_gap_summary()
+    provider_stats = _provider_stats(search_provider, fetch_provider)
     summary = {
-        "mode": SOURCE_TYPE,
+        "mode": source_type,
+        "provider": provider_mode,
         "timestamp_utc": datetime.now(UTC).isoformat(),
         "run_id": run_id,
         "max_searches": args.max_searches,
+        "property_ids_file": args.property_ids_file,
+        "property_id_filter_count": len(property_ids),
         "target_mode": args.target_mode,
         "target_countries": sorted(countries),
         "target_scenes": sorted(scenes),
         "min_distinct_source_urls": args.min_distinct_source_urls,
         "searches_used": searches_used,
         "budget_stop": budget_stop,
-        "credit_budget": args.credit_budget,
+        "credit_budget": args.credit_budget if uses_firecrawl else 0,
         "credit_start_remaining": start_remaining,
-        "credit_end_remaining": _remaining_firecrawl_credits(),
+        "credit_end_remaining": _remaining_firecrawl_credits() if uses_firecrawl else None,
+        "search_manifest_path": args.search_manifest_path,
         "audit_log_path": str(audit_log_path),
         "resume_event_paths": [str(path) for path in resume_paths],
         "terminal_query_skips": terminal_query_skips,
@@ -596,12 +720,9 @@ def main() -> None:
         "fetched_pages_logged": fetched_pages,
         "fetch_failures": fetch_failures,
         "extraction_rejections": extraction_rejections,
-        "firecrawl_provider_stats": {
-            "search_requests": provider.stats.search_requests,
-            "scrape_requests": provider.stats.scrape_requests,
-            "credits_used_reported_by_api": provider.stats.credits_used,
-            "warnings": provider.stats.warnings,
-        },
+        "provider_stats": provider_stats,
+        "firecrawl_provider_stats": provider_stats.get("firecrawl", {}),
+        "scrapling_provider_stats": provider_stats.get("scrapling", {}),
         "target_count": len(targets),
         "draft_count": len(drafts),
         "drafts_by_scene": dict(Counter(d.scene_type for d in drafts)),
@@ -633,7 +754,7 @@ def main() -> None:
         "search_log_path": str(audit_log_path),
         "raw_evidence_ids": raw_ids,
     }
-    summary_path = OUTPUT_DIR / f"{SOURCE_TYPE}_{run_id}.json"
+    summary_path = OUTPUT_DIR / f"{source_type}_{run_id}.json"
     report_path = summary_path.with_suffix(".md")
     summary["summary_path"] = str(summary_path)
     summary["report_path"] = str(report_path)
@@ -906,18 +1027,64 @@ def _has_hard_primary(evidence_rows: list[dict], scene_type: str) -> bool:
 
 
 def _queries_for_property(prop: dict) -> list[str]:
+    queries: list[str] = []
+    country_templates = COUNTRY_QUERY_TEMPLATES.get(str(prop["country"]), {}).get(
+        prop["scene_type"], []
+    )
+    queries.extend(
+        template.format(
+            property_name=prop["canonical_name"],
+            country=prop["country"],
+            city=prop["city"] or "",
+        )
+        for template in country_templates
+    )
+    try:
+        queries.extend(
+            query.query
+            for query in build_localized_queries(
+                country=prop["country"],
+                city=prop["city"] or "",
+                property_name=prop["canonical_name"],
+                scene_type=prop["scene_type"],
+                phases=["firecrawl_gap_fill"],
+            )
+        )
+    except Exception:
+        queries = []
     templates = QUERY_TEMPLATES.get(prop["scene_type"], [])
-    return [
+    queries.extend(
         template.format(
             property_name=prop["canonical_name"],
             country=prop["country"],
             city=prop["city"] or "",
         )
         for template in templates
-    ]
+    )
+    return list(dict.fromkeys(query for query in queries if query.strip()))
+
+
+def _unsafe_broad_firecrawl_query(prop: dict, query: str) -> bool:
+    query_text = str(query or "")
+    if "site:" in query_text.casefold():
+        return False
+    name_tokens = _distinctive_property_tokens(str(prop.get("canonical_name") or ""))
+    if not name_tokens:
+        return True
+    ambiguous_name = len(name_tokens) <= 2 or any(
+        token.isdigit() or len(token) <= 3 for token in name_tokens
+    )
+    if not ambiguous_name:
+        return False
+    has_city = _mentions_city(prop.get("city"), query_text)
+    if re.search(r"\bOR\b", query_text):
+        return True
+    return not has_city
 
 
 def _best_extraction(prop: dict, page) -> object | None:
+    if _low_value_evidence_source(page):
+        return None
     indicators = HARD_PRIMARY.get(prop["scene_type"], [])
     for extraction in extract_indicators(page, prop["canonical_name"], indicators):
         if not extraction.field_value.strip():
@@ -927,6 +1094,17 @@ def _best_extraction(prop: dict, page) -> object | None:
                 continue
             return extraction
     return None
+
+
+LOW_VALUE_EVIDENCE_SOURCE_TOKENS = (
+    "grokipedia.com",
+    "tripadvisor.",
+)
+
+
+def _low_value_evidence_source(page: FetchedPage) -> bool:
+    source_text = f"{page.source_url or ''} {page.source_name or ''}".casefold()
+    return any(token in source_text for token in LOW_VALUE_EVIDENCE_SOURCE_TOKENS)
 
 
 def _plausible(scene_type: str, field_group: str, field_value: str) -> bool:
@@ -945,15 +1123,27 @@ def _plausible(scene_type: str, field_group: str, field_value: str) -> bool:
             return "%" in text and 0 < number <= 100
         return (
             field_group in HARD_PRIMARY["airport_terminal"]
-            and ("passenger" in text or "pax" in text)
+            and ("passenger" in text or "pax" in text or "пассажир" in text)
             and number >= 1_000
         )
     if scene_type == "stadium":
-        return ("seat" in text or "capacity" in text or "spectator" in text) and number >= 500
+        if field_group in {"seat_count", "peak_event_capacity"}:
+            return (
+                (
+                    "seat" in text
+                    or "capacity" in text
+                    or "spectator" in text
+                    or "мест" in text
+                    or "зрител" in text
+                )
+                and number >= 5_000
+            )
+        return field_group in {"event_days", "international_events"} and number >= 1
     if scene_type == "convention_center":
         has_context = any(
             token in text
             for token in ["sqm", "m2", "square", "delegates", "attendees", "events", "people"]
+            + ["кв", "м²", "выстав", "павильон", "конференц", "участник"]
         )
         if not has_context:
             return False
@@ -961,10 +1151,31 @@ def _plausible(scene_type: str, field_group: str, field_value: str) -> bool:
             return number >= 500
         return number >= 10
     if scene_type == "luxury_hotel_mice":
-        return ("room" in text or "key" in text or "guest" in text) and number >= 20
+        if field_group in {"keys", "rooms"} and _looks_like_hotel_review_fragment(text):
+            return False
+        return (
+            "room" in text
+            or "key" in text
+            or "guest" in text
+            or "номер" in text
+            or "гост" in text
+        ) and number >= 20
     if scene_type == "mall_mixed_use":
         has_context = any(
-            token in text for token in ["sqm", "m2", "square", "visitor", "footfall", "visits"]
+            token in text
+            for token in [
+                "sqm",
+                "m2",
+                "square",
+                "visitor",
+                "footfall",
+                "visits",
+                "кв",
+                "м²",
+                "посет",
+                "посещ",
+                "аренд",
+            ]
         )
         if not has_context:
             return False
@@ -973,10 +1184,53 @@ def _plausible(scene_type: str, field_group: str, field_value: str) -> bool:
         return number >= 10_000
     if scene_type == "office_government":
         return (
-            any(token in text for token in ["sqm", "m2", "square", "office", "gfa", "nla"])
+            any(
+                token in text
+                for token in ["sqm", "m2", "square", "office", "gfa", "nla", "кв", "м²", "офис", "аренд"]
+            )
             and number >= 500
         )
+    if scene_type == "mosque":
+        has_context = any(
+            token in text
+            for token in [
+                "sqm",
+                "m2",
+                "m²",
+                "square",
+                "visitor",
+                "visits",
+                "footfall",
+                "worshipper",
+                "prayer",
+                "مساحة",
+                "متر",
+                "زائر",
+                "زوار",
+                "مصل",
+            ]
+        )
+        if not has_context:
+            return False
+        if field_group in {"mosque_area", "gross_floor_area", "prayer_hall_area"}:
+            return number >= 500
+        return number >= 100
     return True
+
+
+def _looks_like_hotel_review_fragment(text: str) -> bool:
+    review_tokens = [
+        "poor",
+        "terrible",
+        "excellent",
+        "very good",
+        "отличное обслуживание",
+        "хорошие номера",
+        "плохо",
+    ]
+    if any(token in text for token in review_tokens):
+        return True
+    return bool(re.search(r"\bв\s+номера\b", text, flags=re.IGNORECASE))
 
 
 GENERIC_SOURCE_PATH_TOKENS = [
@@ -1039,11 +1293,40 @@ def _extraction_is_property_specific(prop: dict, page: FetchedPage, extraction) 
         return False
     if not _mentions_country(prop["country"], f"{content} {source_text}"):
         return False
+    page_identity_context = _page_identity_context(page, content)
+    metric_context = " ".join(_metric_windows(content, extraction.field_value, window_chars=360))
+    if _mentions_conflicting_country(prop["country"], page_identity_context) and not _mentions_city(
+        prop.get("city"), f"{page_identity_context} {metric_context}"
+    ):
+        return False
+    if not (
+        _mentions_location(prop, page_identity_context)
+        or _mentions_location(prop, metric_context)
+    ):
+        return False
+    if prop["scene_type"] == "luxury_hotel_mice" and extraction.field_group in {"keys", "rooms"}:
+        return _value_near_property(prop["canonical_name"], content, extraction.field_value)
     if _value_near_property(prop["canonical_name"], content, extraction.field_value):
+        return True
+    if (
+        _mentions_property(prop["canonical_name"], page_identity_context)
+        and _mentions_location(prop, page_identity_context)
+        and not _is_generic_source_url(source_url)
+    ):
         return True
     if _source_url_mentions_property(prop["canonical_name"], source_url):
         return not _is_generic_source_url(source_url)
     return False
+
+
+def _page_identity_context(page: FetchedPage, content: str) -> str:
+    return " ".join(
+        [
+            str(page.source_url or ""),
+            str(page.source_name or ""),
+            content[:2500],
+        ]
+    )
 
 
 def _mentions_property(property_name: str, text: str) -> bool:
@@ -1051,14 +1334,51 @@ def _mentions_property(property_name: str, text: str) -> bool:
     if not tokens:
         return False
     normalized = _normalized_search_text(text)
-    matched = sum(1 for token in tokens if token in normalized)
+    words = normalized.split()
+    matched = sum(1 for token in tokens if _token_matches(token, words, normalized))
     required = len(tokens) if len(tokens) <= 2 else 2
     return matched >= required
 
 
 def _mentions_country(country: str, text: str) -> bool:
     normalized = _normalized_search_text(text)
-    return _normalized_search_text(country) in normalized
+    country_token = _normalized_search_text(country)
+    aliases = {country_token, *_country_aliases(country)}
+    return any(token and f" {token} " in f" {normalized} " for token in aliases)
+
+
+def _mentions_conflicting_country(target_country: str, text: str) -> bool:
+    normalized = f" {_normalized_search_text(text)} "
+    target = _normalized_search_text(target_country)
+    for country in _known_country_names():
+        token = _normalized_search_text(country)
+        if token and token != target and f" {token} " in normalized:
+            return True
+    return False
+
+
+def _known_country_names() -> set[str]:
+    return {
+        str(country)
+        for countries in REGION_COUNTRIES.values()
+        for country in countries
+    }
+
+
+def _mentions_location(prop: dict, text: str) -> bool:
+    return _mentions_country(prop["country"], text) or _mentions_city(prop.get("city"), text)
+
+
+def _mentions_city(city: str | None, text: str) -> bool:
+    tokens = _distinctive_location_tokens(city or "")
+    if not tokens:
+        return False
+    normalized = _normalized_search_text(text)
+    words = normalized.split()
+    alias_tokens = _city_aliases(city or "")
+    return all(_token_matches(token, words, normalized) for token in tokens) or any(
+        alias and f" {alias} " in f" {normalized} " for alias in alias_tokens
+    )
 
 
 def _source_url_mentions_property(property_name: str, source_url: str) -> bool:
@@ -1123,8 +1443,122 @@ def _distinctive_property_tokens(property_name: str) -> list[str]:
     ]
 
 
+def _distinctive_location_tokens(location: str) -> list[str]:
+    tokens = re.findall(r"[a-z0-9]+", _normalized_search_text(location))
+    return [
+        token
+        for token in tokens
+        if len(token) >= 3 and token not in PROPERTY_TOKEN_STOPWORDS
+    ]
+
+
 def _normalized_search_text(text: str) -> str:
-    return " ".join(re.findall(r"[a-z0-9]+", str(text or "").casefold()))
+    transliterated = _transliterate_cyrillic(str(text or ""))
+    ascii_text = (
+        unicodedata.normalize("NFKD", transliterated)
+        .encode("ascii", "ignore")
+        .decode("ascii")
+    )
+    return " ".join(re.findall(r"[a-z0-9]+", ascii_text.casefold()))
+
+
+CYRILLIC_TRANSLITERATION = {
+    "а": "a",
+    "б": "b",
+    "в": "v",
+    "г": "g",
+    "д": "d",
+    "е": "e",
+    "ё": "e",
+    "ж": "zh",
+    "з": "z",
+    "и": "i",
+    "й": "y",
+    "к": "k",
+    "л": "l",
+    "м": "m",
+    "н": "n",
+    "о": "o",
+    "п": "p",
+    "р": "r",
+    "с": "s",
+    "т": "t",
+    "у": "u",
+    "ф": "f",
+    "х": "kh",
+    "ц": "ts",
+    "ч": "ch",
+    "ш": "sh",
+    "щ": "shch",
+    "ъ": "",
+    "ы": "y",
+    "ь": "",
+    "э": "e",
+    "ю": "yu",
+    "я": "ya",
+}
+
+
+def _transliterate_cyrillic(text: str) -> str:
+    chars: list[str] = []
+    for char in text:
+        lower = char.casefold()
+        replacement = CYRILLIC_TRANSLITERATION.get(lower)
+        chars.append(replacement if replacement is not None else char)
+    return "".join(chars)
+
+
+def _token_matches(token: str, words: list[str], normalized: str) -> bool:
+    if f" {token} " in f" {normalized} ":
+        return True
+    variants = _romanization_variants(token)
+    if any(variant and f" {variant} " in f" {normalized} " for variant in variants):
+        return True
+    if len(token) < 6:
+        return False
+    for word in words[:600]:
+        if len(word) < 6:
+            continue
+        if difflib.SequenceMatcher(a=token, b=word).ratio() >= 0.88:
+            return True
+    return False
+
+
+def _romanization_variants(token: str) -> set[str]:
+    variants = {token}
+    variants.update(
+        {
+            "tsentralnyy": {"central"},
+            "tsentralny": {"central"},
+            "dinamo": {"dynamo"},
+            "lva": {"lev"},
+            "yashina": {"yashin"},
+        }.get(token, set())
+    )
+    if token.endswith("a") and len(token) >= 6:
+        variants.add(token[:-1])
+    if token.endswith("y"):
+        variants.add(f"{token[:-1]}iy")
+        variants.add(f"{token[:-1]}i")
+    variants.add(token.replace("ye", "e"))
+    variants.add(token.replace("yo", "e"))
+    variants.add(token.replace("ts", "c"))
+    return {variant for variant in variants if variant}
+
+
+def _country_aliases(country: str) -> set[str]:
+    if str(country).casefold() == "russia":
+        return {"rossiya", "rossii", "rossiyskaya federatsiya", "rf"}
+    return set()
+
+
+def _city_aliases(city: str) -> set[str]:
+    normalized = str(city or "").casefold()
+    if normalized == "moscow":
+        return {"moskva"}
+    if normalized in {"saint petersburg", "st petersburg", "st. petersburg"}:
+        return {"sankt peterburg", "sankt peterburga", "sankt peterburge", "spb"}
+    return set()
 
 
 def _is_generic_source_url(source_url: str) -> bool:
@@ -1132,7 +1566,14 @@ def _is_generic_source_url(source_url: str) -> bool:
     return any(token in lower for token in GENERIC_SOURCE_PATH_TOKENS)
 
 
-def _draft_for_existing(prop: dict, extraction, content_text: str, registry: dict) -> CandidateDraft:
+def _draft_for_existing(
+    prop: dict,
+    extraction,
+    content_text: str,
+    registry: dict,
+    *,
+    source_type: str = SOURCE_TYPE,
+) -> CandidateDraft:
     annual_visits = _annual_visits_from_value(extraction.field_group, extraction.field_value)
     return CandidateDraft(
         region=_region_for_country(prop["country"]),
@@ -1152,10 +1593,10 @@ def _draft_for_existing(prop: dict, extraction, content_text: str, registry: dic
         source_name=str(extraction.source_name),
         source_tier=_tier_value(extraction.source_tier),
         source_url=str(extraction.source_url),
-        source_date=extraction.source_date or "",
+        source_date=extraction.source_date or TODAY,
         evidence_type="Direct",
         bbox=registry["countries"][prop["country"]]["bbox"],
-        source_type=SOURCE_TYPE,
+        source_type=source_type,
         content_text=content_text[:8000],
         identity_match_status=KNOWN_PROPERTY,
         matched_property_id=prop["id"],
@@ -1172,6 +1613,8 @@ def _annual_visits_from_value(field_group: str, field_value: str) -> float | Non
         "passenger_throughput",
         "annual_footfall",
         "footfall",
+        "annual_visitors",
+        "daily_visitors",
         "daily_ridership",
         "interchange_volume",
     }:
@@ -1182,8 +1625,12 @@ def _annual_visits_from_value(field_group: str, field_value: str) -> float | Non
     if number is None:
         return None
     lower = field_value.casefold()
-    if "million" in lower:
+    if any(token in lower for token in ["million", "миллион", "млн"]):
         number *= 1_000_000
+    elif any(token in lower for token in ["thousand", "тыс", "тысяч"]):
+        number *= 1_000
+    if field_group in {"daily_visitors", "daily_ridership", "interchange_volume"}:
+        number *= 365
     return float(number)
 
 
@@ -1192,11 +1639,19 @@ def _clean_field_value(value: str) -> str:
 
 
 def _first_number(value: str) -> float | None:
-    match = re.search(r"\d[\d,.]*", value)
+    match = re.search(r"\d(?:[\d,.\s]*\d)?", value)
     if not match:
         return None
+    raw = match.group(0)
+    raw = re.sub(r"\s+", "", raw)
+    if "," in raw and "." not in raw:
+        left, right = raw.split(",", 1)
+        if 0 < len(right) <= 2:
+            raw = f"{left}.{right}"
+        else:
+            raw = raw.replace(",", "")
     try:
-        return float(match.group(0).replace(",", ""))
+        return float(raw.replace(",", ""))
     except ValueError:
         return None
 
@@ -1205,8 +1660,11 @@ def _scaled_first_number(value: str) -> float | None:
     number = _first_number(value)
     if number is None:
         return None
-    if "million" in value.casefold():
+    lower = value.casefold()
+    if any(token in lower for token in ["million", "миллион", "млн"]):
         number *= 1_000_000
+    elif any(token in lower for token in ["thousand", "тыс", "тысяч"]):
+        number *= 1_000
     return number
 
 
@@ -1279,7 +1737,14 @@ def _url_key(url: str) -> str:
 
 
 def _audit_event_paths(directory: Path) -> list[Path]:
-    return sorted(directory.glob(f"{SOURCE_TYPE}_*_events.jsonl"))
+    paths: set[Path] = set()
+    for pattern in (
+        f"{SOURCE_TYPE}_*_events.jsonl",
+        f"{SCRAPLING_SOURCE_TYPE}_*_events.jsonl",
+        "*full_evidence_backfill*_events.jsonl",
+    ):
+        paths.update(directory.glob(pattern))
+    return sorted(paths)
 
 
 def _search_result_payload(result: SearchResult) -> dict:
@@ -1301,20 +1766,129 @@ def _search_results_from_payloads(payloads: list[dict]) -> list[SearchResult]:
             SearchResult(
                 title=str(payload.get("title") or url),
                 url=url,
-                source_name=str(payload.get("source_name") or "Firecrawl Search"),
+                source_name=str(payload.get("source_name") or "Search Manifest"),
                 snippet=str(payload.get("snippet") or ""),
             )
         )
     return results
 
 
-def _provider_stats(provider: FirecrawlPublicEvidenceProvider) -> dict:
-    return {
-        "search_requests": provider.stats.search_requests,
-        "scrape_requests": provider.stats.scrape_requests,
-        "credits_used_reported_by_api": provider.stats.credits_used,
-        "warnings": list(provider.stats.warnings),
-    }
+def _build_backfill_providers(
+    *,
+    args: argparse.Namespace,
+    run_dir: Path,
+    store: EvidenceCurationStore,
+    uses_firecrawl: bool,
+) -> tuple[SearchProvider, PageFetchProvider]:
+    source_cache = store.source_cache()
+    if args.provider == "firecrawl":
+        provider = FirecrawlPublicEvidenceProvider.from_env(cache=source_cache)
+        return provider, provider
+
+    manifest_provider = SearchManifestProvider.from_path_value(
+        args.search_manifest_path,
+        strict=True,
+    )
+    scrapling_provider = ScraplingPublicEvidenceProvider(
+        cache=source_cache,
+        artifact_dir=run_dir / "scrapling_pages",
+        timeout_ms=args.timeout_ms,
+    )
+    firecrawl_provider = (
+        FirecrawlPublicEvidenceProvider.from_env(cache=source_cache)
+        if uses_firecrawl
+        else None
+    )
+
+    if manifest_provider.enabled:
+        if scrapling_provider.enabled:
+            return manifest_provider, scrapling_provider
+        if firecrawl_provider is not None:
+            return manifest_provider, firecrawl_provider
+        raise RuntimeError(
+            "Search manifest contains URLs but Scrapling is unavailable. "
+            "Install with `pip install '.[sweep]'` and run `scrapling install`, "
+            "or pass --provider auto --allow-firecrawl-fallback."
+        )
+
+    if firecrawl_provider is not None:
+        return (
+            firecrawl_provider,
+            scrapling_provider if scrapling_provider.enabled else firecrawl_provider,
+        )
+
+    return manifest_provider, scrapling_provider
+
+
+def _provider_stats(
+    search_provider: SearchProvider,
+    fetch_provider: PageFetchProvider,
+) -> dict:
+    result: dict[str, dict] = {}
+    for provider in _unique_providers(search_provider, fetch_provider):
+        stats = getattr(provider, "stats", None)
+        if stats is not None and hasattr(stats, "search_requests"):
+            result["firecrawl"] = {
+                "search_requests": int(getattr(stats, "search_requests", 0) or 0),
+                "scrape_requests": int(getattr(stats, "scrape_requests", 0) or 0),
+                "credits_used_reported_by_api": float(
+                    getattr(stats, "credits_used", 0) or 0
+                ),
+                "warnings": list(getattr(stats, "warnings", []) or []),
+            }
+        if stats is not None and hasattr(stats, "fetch_requests"):
+            result["scrapling"] = {
+                "fetch_requests": int(getattr(stats, "fetch_requests", 0) or 0),
+                "static_fetch_count": int(getattr(stats, "static_fetch_count", 0) or 0),
+                "dynamic_fetch_count": int(getattr(stats, "dynamic_fetch_count", 0) or 0),
+                "stealth_fetch_count": int(getattr(stats, "stealth_fetch_count", 0) or 0),
+                "cache_hits": int(getattr(stats, "cache_hits", 0) or 0),
+                "robots_disallowed_count": int(
+                    getattr(stats, "robots_disallowed_count", 0) or 0
+                ),
+                "restricted_page_count": int(
+                    getattr(stats, "restricted_page_count", 0) or 0
+                ),
+                "artifact_write_count": int(
+                    getattr(stats, "artifact_write_count", 0) or 0
+                ),
+                "failures": list(getattr(stats, "failures", []) or []),
+                "warnings": list(getattr(stats, "warnings", []) or []),
+            }
+        if isinstance(provider, SearchManifestProvider):
+            result["search_manifest"] = {
+                "search_requests": int(getattr(provider, "search_requests", 0) or 0),
+                "row_count": len(getattr(provider, "rows", []) or []),
+                "paths": [str(path) for path in getattr(provider, "paths", [])],
+            }
+    result["request_count_total"] = _provider_request_count(search_provider, fetch_provider)
+    return result
+
+
+def _provider_request_count(
+    search_provider: SearchProvider,
+    fetch_provider: PageFetchProvider,
+) -> int:
+    total = 0
+    for provider in _unique_providers(search_provider, fetch_provider):
+        stats = getattr(provider, "stats", None)
+        if stats is None:
+            continue
+        total += int(getattr(stats, "search_requests", 0) or 0)
+        total += int(getattr(stats, "scrape_requests", 0) or 0)
+    return total
+
+
+def _unique_providers(*providers: object) -> list[object]:
+    seen: set[int] = set()
+    unique: list[object] = []
+    for provider in providers:
+        marker = id(provider)
+        if marker in seen:
+            continue
+        seen.add(marker)
+        unique.append(provider)
+    return unique
 
 
 def _persist_fetched_page(page: FetchedPage, pages_dir: Path) -> dict:
@@ -1347,7 +1921,7 @@ def _page_from_logged_event(event: dict) -> FetchedPage | None:
     fetched_at = _parse_datetime(event.get("fetched_at"))
     return FetchedPage(
         source_url=str(event.get("source_url") or event.get("url") or ""),
-        source_name=str(event.get("source_name") or "Firecrawl Search"),
+        source_name=str(event.get("source_name") or "Public Web Evidence"),
         source_tier=_source_tier(event.get("source_tier")),
         source_date=event.get("source_date") if event.get("source_date") else None,
         fetched_at=fetched_at,
@@ -1376,15 +1950,24 @@ def _source_tier(value: object) -> SourceTier:
 def _render_report(summary: dict) -> str:
     before_lines = _scene_lines(summary["gap_summary_before"])
     after_lines = _scene_lines(summary["gap_summary_after"])
+    labels = summary.get("labels") or {}
+    low_evidence_labels = labels.get(
+        "low_primary_metric_evidence_properties",
+        labels.get("skipped", 0),
+    )
     return (
-        "# Firecrawl Full Evidence Backfill\n\n"
-        f"- Firecrawl searches used: {summary['searches_used']} / {summary['max_searches']}\n"
+        "# Public Web Evidence Backfill\n\n"
+        f"- Provider: {summary.get('provider')}\n"
+        f"- Source type: {summary.get('mode')}\n"
+        f"- Searches used: {summary['searches_used']} / {summary['max_searches']}\n"
         f"- Durable audit log: {summary['audit_log_path']}\n"
+        f"- Search manifest: {summary.get('search_manifest_path') or 'none'}\n"
         f"- Reused logged search result sets: {summary['reused_search_result_sets']}\n"
         f"- Reused logged pages: {summary['reused_pages']}\n"
+        f"- Provider stats: {json.dumps(summary.get('provider_stats') or {}, ensure_ascii=False)}\n"
         f"- Drafts written: {summary['draft_count']} {summary['drafts_by_scene']}\n"
         f"- Raw evidence written/changed: {summary['raw_evidence_written_or_changed']}\n"
-        f"- Low evidence labels: {summary['labels']['low_primary_metric_evidence_properties']}\n"
+        f"- Low evidence labels: {low_evidence_labels}\n"
         f"- Search log: {summary['search_log_path']}\n\n"
         "## Before\n"
         f"{before_lines}\n\n"
@@ -1407,6 +1990,28 @@ def _scene_lines(gap_summary: dict) -> str:
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--provider",
+        choices=["scrapling", "firecrawl", "auto"],
+        default="scrapling",
+        help=(
+            "Evidence provider mode. Default scrapling reads retained search manifests "
+            "and fetches pages with Scrapling; firecrawl is explicit fallback only."
+        ),
+    )
+    parser.add_argument(
+        "--search-manifest-path",
+        default=os.getenv("ISITE2_SEARCH_MANIFEST_PATHS", ""),
+        help=(
+            "Comma/semicolon-separated JSON/YAML/JSONL search manifests. Required fields: "
+            "language/search_channel/query/title/url/snippet/adopted/skipped_reason/target_scene."
+        ),
+    )
+    parser.add_argument(
+        "--allow-firecrawl-fallback",
+        action="store_true",
+        help="Allow --provider auto to use Firecrawl when retained search manifests are unavailable.",
+    )
     parser.add_argument("--max-searches", type=int, default=120)
     parser.add_argument("--max-properties", type=int, default=80)
     parser.add_argument("--result-limit", type=int, default=3)
@@ -1435,10 +2040,19 @@ def _parse_args() -> argparse.Namespace:
         "--credit-budget",
         type=int,
         default=1000,
-        help="Maximum Firecrawl credits to spend. Use 0 for a no-live-request dry run; use -1 to disable the guard.",
+        help=(
+            "Maximum Firecrawl credits to spend when Firecrawl is explicitly enabled. "
+            "Ignored for default Scrapling runs; use 0 to block live Firecrawl, -1 to disable the guard."
+        ),
     )
     parser.add_argument("--credit-check-interval", type=int, default=5)
     parser.add_argument("--audit-log-path", type=str, default=None)
+    parser.add_argument(
+        "--property-ids-file",
+        type=str,
+        default="",
+        help="Optional newline/JSON list of property ids to target before max-properties selection.",
+    )
     parser.add_argument("--no-resume", action="store_true")
     parser.add_argument("--force-retry", action="store_true")
     parser.add_argument("--retry-failures", action="store_true")
@@ -1454,10 +2068,32 @@ def _split_filter(value: str) -> set[str]:
     }
 
 
+def _load_property_ids(path_value: str) -> set[str]:
+    if not path_value:
+        return set()
+    path = Path(path_value)
+    if not path.exists():
+        raise FileNotFoundError(f"property ids file not found: {path}")
+    text = path.read_text(encoding="utf-8").strip()
+    if not text:
+        return set()
+    if text.startswith("["):
+        payload = json.loads(text)
+        if not isinstance(payload, list):
+            raise ValueError("property ids JSON file must contain a list")
+        return {str(item).strip() for item in payload if str(item).strip()}
+    return {
+        line.strip()
+        for line in text.splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    }
+
+
 def _remaining_firecrawl_credits() -> int | None:
     try:
+        wrapper = Path(__file__).with_name("run_firecrawl_cli.py")
         completed = subprocess.run(
-            ["firecrawl", "credit-usage", "--json"],
+            [sys.executable, str(wrapper), "--", "credit-usage", "--json"],
             check=True,
             capture_output=True,
             env=firecrawl_subprocess_env(),
@@ -1476,7 +2112,10 @@ def _budget_exhausted(
     budget: int,
     request_count: int,
     check_interval: int,
+    enabled: bool = True,
 ) -> bool:
+    if not enabled:
+        return False
     if budget == 0:
         return True
     if budget < 0 or start_remaining is None:

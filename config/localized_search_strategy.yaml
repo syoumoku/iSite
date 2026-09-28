@@ -7,6 +7,9 @@ defaults:
   scrape: false
   firecrawl_mode: "last_resort"
   query_joiner: " OR "
+  localization_profile_required: true
+  local_language_first: true
+  search_engine_profile_ttl_days: 365
 
 phases:
   structured_source_discovery:
@@ -25,6 +28,9 @@ phases:
 country_profiles:
   default:
     languages: ["en"]
+    official_languages: []
+    primary_search_engines: []
+    search_engine_profile_required: true
     official_source_terms:
       - "official"
       - "annual report"
@@ -35,6 +41,13 @@ country_profiles:
     languages: ["fr", "ar", "en"]
     official_source_terms: ["statistiques", "rapport annuel", "ministère", "ديوان", "إحصائيات"]
     preferred_domains: [".dz"]
+  Angola:
+    languages: ["pt", "en"]
+    official_languages: ["pt"]
+    official_source_terms: ["oficial", "estatísticas", "relatório anual", "capacidade", "área bruta locável", "número de quartos", "número de camas", "estudantes"]
+    preferred_domains: [".ao", ".gov.ao", ".co.ao"]
+    primary_search_engines: ["Google Angola", "Bing cross-check"]
+    search_engine_profile_required: true
   Argentina:
     languages: ["es", "en"]
     official_source_terms: ["estadísticas", "memoria anual", "informe oficial", "gobierno"]
@@ -56,9 +69,12 @@ country_profiles:
     official_source_terms: ["estadísticas", "informe anual", "oficial", "gobierno"]
     preferred_domains: [".gob.bo", ".bo"]
   Botswana:
-    languages: ["en"]
-    official_source_terms: ["official", "annual report", "statistics", "authority"]
-    preferred_domains: [".bw", ".gov.bw"]
+    languages: ["en", "tn"]
+    official_languages: ["en"]
+    official_source_terms: ["official", "annual report", "statistics", "authority", "capacity", "rooms", "beds", "students"]
+    preferred_domains: [".bw", ".gov.bw", ".co.bw"]
+    primary_search_engines: ["Google Botswana", "Bing cross-check"]
+    search_engine_profile_required: true
   Brazil:
     languages: ["pt", "en"]
     official_source_terms: ["estatísticas", "relatório anual", "anuário", "oficial", "site:gov.br"]
@@ -79,6 +95,23 @@ country_profiles:
     languages: ["fr", "en"]
     official_source_terms: ["statistiques", "rapport annuel", "ministère", "officiel"]
     preferred_domains: [".cf"]
+  Chad:
+    languages: ["fr", "ar", "en"]
+    official_languages: ["fr", "ar"]
+    official_source_terms:
+      - "statistiques"
+      - "rapport annuel"
+      - "ministère"
+      - "officiel"
+      - "trafic passagers"
+      - "capacité"
+      - "nombre de chambres"
+      - "surface"
+      - "إحصائيات"
+      - "تقرير سنوي"
+    preferred_domains: [".td", ".gouv.td", ".gov.td"]
+    primary_search_engines: ["Google", "Bing cross-check"]
+    search_engine_profile_required: true
   Chile:
     languages: ["es", "en"]
     official_source_terms: ["estadísticas", "memoria anual", "informe oficial", "gobierno"]
@@ -113,20 +146,84 @@ country_profiles:
     preferred_domains: [".ga", ".gouv.ga"]
   Ghana:
     languages: ["en"]
-    official_source_terms: ["official", "annual report", "statistics", "authority"]
-    preferred_domains: [".gh", ".gov.gh"]
+    official_languages: ["en"]
+    official_source_terms: ["official", "annual report", "statistics", "authority", "capacity", "gross leasable area", "rooms", "beds", "students"]
+    preferred_domains: [".gh", ".gov.gh", ".com.gh", ".edu.gh"]
+    primary_search_engines: ["Google Ghana", "Bing cross-check"]
+    search_engine_profile_required: true
+  Guinea:
+    languages: ["fr", "en"]
+    official_languages: ["fr"]
+    official_source_terms:
+      - "officiel"
+      - "statistiques"
+      - "rapport annuel"
+      - "ministère"
+      - "trafic passagers"
+      - "capacité"
+      - "nombre de chambres"
+      - "surface"
+    preferred_domains: [".gn", ".gov.gn"]
+    primary_search_engines: ["Google", "Bing cross-check"]
+    search_engine_profile_required: true
+  Indonesia:
+    languages: ["id", "en"]
+    official_languages: ["id"]
+    official_source_terms:
+      - "resmi"
+      - "laporan tahunan"
+      - "statistik"
+      - "kementerian"
+      - "jumlah penumpang"
+      - "luas sewa"
+      - "kapasitas"
+    preferred_domains: [".go.id", ".id", ".co.id"]
+    primary_search_engines: ["Google", "Bing cross-check"]
+    search_engine_profile_required: true
   Kenya:
-    languages: ["en"]
-    official_source_terms: ["official", "annual report", "statistics", "authority"]
-    preferred_domains: [".ke", ".go.ke"]
+    languages: ["sw", "en"]
+    official_languages: ["sw", "en"]
+    official_source_terms: ["rasmi", "takwimu", "ripoti ya mwaka", "idadi ya abiria", "uwezo", "eneo", "vyumba", "vitanda", "wanafunzi", "official", "annual report"]
+    preferred_domains: [".ke", ".go.ke", ".co.ke", ".ac.ke"]
+    primary_search_engines: ["Google Kenya", "Bing cross-check"]
+    search_engine_profile_required: true
   Liberia:
     languages: ["en"]
     official_source_terms: ["official", "annual report", "statistics", "authority"]
     preferred_domains: [".lr", ".gov.lr"]
   Libya:
     languages: ["ar", "en"]
-    official_source_terms: ["إحصائيات", "تقرير سنوي", "رسمي", "وزارة", "annual report"]
+    official_languages: ["ar"]
+    official_source_terms:
+      - "إحصائيات"
+      - "تقرير سنوي"
+      - "رسمي"
+      - "وزارة"
+      - "عدد المسافرين"
+      - "السعة"
+      - "عدد الغرف"
+      - "مساحة"
+      - "annual report"
     preferred_domains: [".ly", ".gov.ly"]
+    primary_search_engines: ["Google", "Bing cross-check"]
+    search_engine_profile_required: true
+  Madagascar:
+    languages: ["fr", "mg", "en"]
+    official_languages: ["mg", "fr"]
+    official_source_terms:
+      - "statistiques"
+      - "rapport annuel"
+      - "officiel"
+      - "ministère"
+      - "trafic passagers"
+      - "capacité"
+      - "nombre de chambres"
+      - "surface"
+      - "antontan'isa"
+      - "tatitra isan-taona"
+    preferred_domains: [".mg", ".gov.mg"]
+    primary_search_engines: ["Google", "Bing cross-check"]
+    search_engine_profile_required: true
   Malawi:
     languages: ["en"]
     official_source_terms: ["official", "annual report", "statistics", "authority"]
@@ -149,20 +246,374 @@ country_profiles:
     preferred_domains: [".ma", ".gov.ma"]
   Mozambique:
     languages: ["pt", "en"]
-    official_source_terms: ["estatísticas", "relatório anual", "oficial", "governo"]
-    preferred_domains: [".mz", ".gov.mz"]
+    official_languages: ["pt"]
+    official_source_terms: ["estatísticas", "relatório anual", "oficial", "governo", "capacidade", "área bruta locável", "número de quartos", "número de camas", "estudantes"]
+    preferred_domains: [".mz", ".gov.mz", ".co.mz", ".ac.mz"]
+    primary_search_engines: ["Google Moçambique", "Bing cross-check"]
+    search_engine_profile_required: true
   Namibia:
-    languages: ["en"]
-    official_source_terms: ["official", "annual report", "statistics", "authority"]
-    preferred_domains: [".na", ".gov.na"]
+    languages: ["en", "af"]
+    official_languages: ["en"]
+    official_source_terms: ["official", "annual report", "statistics", "authority", "capacity", "floor area", "rooms", "beds", "students"]
+    preferred_domains: [".na", ".gov.na", ".com.na"]
+    primary_search_engines: ["Google Namibia", "Bing cross-check"]
+    search_engine_profile_required: true
   Niger:
     languages: ["fr", "en"]
     official_source_terms: ["statistiques", "rapport annuel", "ministère", "officiel"]
     preferred_domains: [".ne"]
+  Equatorial Guinea:
+    languages: ["es", "fr", "pt", "en"]
+    official_languages: ["es", "fr", "pt"]
+    official_source_terms: ["estadísticas", "informe anual", "oficial", "ministerio", "statistiques", "rapport annuel", "capacidad", "superficie", "número de habitaciones"]
+    preferred_domains: [".gq", ".gov.gq"]
+    primary_search_engines: ["Google Equatorial Guinea", "Bing cross-check"]
+    search_engine_profile_required: true
+  Guinea-Bissau:
+    languages: ["pt", "en"]
+    official_languages: ["pt"]
+    official_source_terms: ["estatísticas", "relatório anual", "oficial", "governo", "ministério", "capacidade", "área", "número de quartos"]
+    preferred_domains: [".gw", ".gov.gw"]
+    primary_search_engines: ["Google Guinea-Bissau", "Bing cross-check"]
+    search_engine_profile_required: true
+  Eswatini:
+    languages: ["en", "ss"]
+    official_languages: ["en", "ss"]
+    official_source_terms: ["official", "annual report", "statistics", "government", "authority", "capacity", "floor area", "rooms", "beds"]
+    preferred_domains: [".sz", ".gov.sz", ".co.sz"]
+    primary_search_engines: ["Google Eswatini", "Bing cross-check"]
+    search_engine_profile_required: true
+  Zimbabwe:
+    languages: ["en", "sn", "nd"]
+    official_languages: ["en", "sn", "nd"]
+    official_source_terms: ["official", "annual report", "statistics", "government", "authority", "passenger traffic", "capacity", "floor area", "rooms", "beds", "students"]
+    preferred_domains: [".zw", ".gov.zw", ".co.zw", ".ac.zw"]
+    primary_search_engines: ["Google Zimbabwe", "Bing cross-check"]
+    search_engine_profile_required: true
+  Reunion:
+    languages: ["fr", "en"]
+    official_languages: ["fr"]
+    official_source_terms: ["statistiques", "rapport annuel", "officiel", "préfecture", "trafic passagers", "fréquentation", "capacité", "surface", "nombre de chambres"]
+    preferred_domains: [".re", ".gouv.fr", ".fr"]
+    primary_search_engines: ["Google Réunion", "Qwant", "Bing cross-check"]
+    search_engine_profile_required: true
+  Somalia:
+    languages: ["so", "ar", "en"]
+    official_languages: ["so", "ar"]
+    official_source_terms: ["official", "annual report", "statistics", "government", "ministry", "tirakoob", "warbixin sanadle", "إحصائيات", "تقرير سنوي", "سعة", "مساحة"]
+    preferred_domains: [".so", ".gov.so"]
+    primary_search_engines: ["Google Somalia", "Bing cross-check"]
+    search_engine_profile_required: true
+  Slovakia:
+    languages: ["sk", "en"]
+    official_languages: ["sk"]
+    official_source_terms: ["štatistika", "výročná správa", "oficiálne", "ministerstvo", "kapacita", "návštevnosť", "plocha", "počet izieb"]
+    preferred_domains: [".sk", ".gov.sk"]
+    primary_search_engines: ["Google Slovakia", "Bing cross-check"]
+    search_engine_profile_required: true
+  Moldova:
+    languages: ["ro", "ru", "en"]
+    official_languages: ["ro"]
+    official_source_terms: ["statistici", "raport anual", "oficial", "guvern", "minister", "capacitate", "suprafață", "număr de camere", "статистика", "годовой отчет"]
+    preferred_domains: [".md", ".gov.md"]
+    primary_search_engines: ["Google Moldova", "Bing cross-check"]
+    search_engine_profile_required: true
+  Cyprus:
+    languages: ["el", "tr", "en"]
+    official_languages: ["el", "tr"]
+    official_source_terms: ["στατιστικά", "ετήσια έκθεση", "επίσημο", "κυβέρνηση", "χωρητικότητα", "επιφάνεια", "istatistik", "yıllık rapor", "kapasite"]
+    preferred_domains: [".cy", ".gov.cy"]
+    primary_search_engines: ["Google Cyprus", "Bing cross-check"]
+    search_engine_profile_required: true
+  Albania:
+    languages: ["sq", "en"]
+    official_languages: ["sq"]
+    official_source_terms: ["statistika", "raport vjetor", "zyrtar", "qeveria", "kapaciteti", "sipërfaqe", "numri i dhomave"]
+    preferred_domains: [".al", ".gov.al"]
+    primary_search_engines: ["Google Albania", "Bing cross-check"]
+    search_engine_profile_required: true
+  North Macedonia:
+    languages: ["mk", "sq", "en"]
+    official_languages: ["mk"]
+    official_source_terms: ["статистика", "годишен извештај", "официјално", "влада", "капацитет", "површина", "број на соби", "statistika", "raport vjetor"]
+    preferred_domains: [".mk", ".gov.mk"]
+    primary_search_engines: ["Google North Macedonia", "Bing cross-check"]
+    search_engine_profile_required: true
+  Bulgaria:
+    languages: ["bg", "en"]
+    official_languages: ["bg"]
+    official_source_terms: ["статистика", "годишен отчет", "официално", "министерство", "капацитет", "площ", "брой стаи"]
+    preferred_domains: [".bg", ".government.bg"]
+    primary_search_engines: ["Google Bulgaria", "Bing cross-check"]
+    search_engine_profile_required: true
+  Croatia:
+    languages: ["hr", "en"]
+    official_languages: ["hr"]
+    official_source_terms: ["statistika", "godišnje izvješće", "službeno", "ministarstvo", "kapacitet", "površina", "broj soba"]
+    preferred_domains: [".hr", ".gov.hr"]
+    primary_search_engines: ["Google Croatia", "Bing cross-check"]
+    search_engine_profile_required: true
+  Slovenia:
+    languages: ["sl", "en"]
+    official_languages: ["sl"]
+    official_source_terms: ["statistika", "letno poročilo", "uradno", "ministrstvo", "zmogljivost", "površina", "število sob"]
+    preferred_domains: [".si", ".gov.si"]
+    primary_search_engines: ["Google Slovenia", "Bing cross-check"]
+    search_engine_profile_required: true
+  Bosnia and Herzegovina:
+    languages: ["bs", "hr", "sr", "en"]
+    official_languages: ["bs", "hr", "sr"]
+    official_source_terms: ["statistika", "godišnji izvještaj", "službeno", "ministarstvo", "kapacitet", "površina", "broj soba"]
+    preferred_domains: [".ba", ".gov.ba"]
+    primary_search_engines: ["Google Bosnia and Herzegovina", "Bing cross-check"]
+    search_engine_profile_required: true
+  Serbia:
+    languages: ["sr", "en"]
+    official_languages: ["sr"]
+    official_source_terms: ["статистика", "годишњи извештај", "званично", "министарство", "капацитет", "површина", "број соба", "statistika", "godišnji izveštaj"]
+    preferred_domains: [".rs", ".gov.rs"]
+    primary_search_engines: ["Google Serbia", "Bing cross-check"]
+    search_engine_profile_required: true
+  Montenegro:
+    languages: ["sr", "hr", "bs", "sq", "en"]
+    official_languages: ["sr", "hr", "bs", "sq"]
+    official_source_terms: ["statistika", "godišnji izvještaj", "zvanično", "ministarstvo", "kapacitet", "površina", "broj soba"]
+    preferred_domains: [".me", ".gov.me"]
+    primary_search_engines: ["Google Montenegro", "Bing cross-check"]
+    search_engine_profile_required: true
+  Nicaragua:
+    languages: ["es", "en"]
+    official_languages: ["es"]
+    official_source_terms: ["estadísticas", "informe anual", "oficial", "gobierno", "ministerio", "capacidad", "superficie", "número de habitaciones"]
+    preferred_domains: [".gob.ni", ".ni"]
+    primary_search_engines: ["Google Nicaragua", "Bing cross-check"]
+    search_engine_profile_required: true
+  Venezuela:
+    languages: ["es", "en"]
+    official_languages: ["es"]
+    official_source_terms: ["estadísticas", "informe anual", "oficial", "gobierno", "ministerio", "capacidad", "superficie", "número de habitaciones"]
+    preferred_domains: [".gob.ve", ".ve"]
+    primary_search_engines: ["Google Venezuela", "Bing cross-check"]
+    search_engine_profile_required: true
+  Haiti:
+    languages: ["fr", "ht", "en"]
+    official_languages: ["fr", "ht"]
+    official_source_terms: ["statistiques", "rapport annuel", "officiel", "ministère", "capacité", "surface", "nombre de chambres", "estatistik", "rapò anyèl"]
+    preferred_domains: [".ht", ".gouv.ht"]
+    primary_search_engines: ["Google Haiti", "Bing cross-check"]
+    search_engine_profile_required: true
+  Uruguay:
+    languages: ["es", "en"]
+    official_languages: ["es"]
+    official_source_terms: ["estadísticas", "informe anual", "memoria anual", "oficial", "gobierno", "capacidad", "superficie", "número de habitaciones"]
+    preferred_domains: [".gub.uy", ".uy"]
+    primary_search_engines: ["Google Uruguay", "Bing cross-check"]
+    search_engine_profile_required: true
+  Papua New Guinea:
+    languages: ["en", "tpi", "ho"]
+    official_languages: ["en", "tpi", "ho"]
+    official_source_terms: ["official", "annual report", "statistics", "government", "authority", "capacity", "floor area", "rooms", "beds", "students"]
+    preferred_domains: [".pg", ".gov.pg", ".com.pg"]
+    primary_search_engines: ["Google Papua New Guinea", "Bing cross-check"]
+    search_engine_profile_required: true
+  Solomon Islands:
+    languages: ["en"]
+    official_languages: ["en"]
+    official_source_terms: ["official", "annual report", "statistics", "government", "authority", "capacity", "floor area", "rooms", "beds", "students"]
+    preferred_domains: [".sb", ".gov.sb", ".com.sb"]
+    primary_search_engines: ["Google Solomon Islands", "Bing cross-check"]
+    search_engine_profile_required: true
+  Fiji:
+    languages: ["en", "fj", "hi"]
+    official_languages: ["en", "fj", "hi"]
+    official_source_terms: ["official", "annual report", "statistics", "government", "authority", "capacity", "floor area", "rooms", "beds", "students"]
+    preferred_domains: [".fj", ".gov.fj", ".com.fj"]
+    primary_search_engines: ["Google Fiji", "Bing cross-check"]
+    search_engine_profile_required: true
+  Nepal:
+    languages: ["ne", "en"]
+    official_languages: ["ne"]
+    official_source_terms: ["आधिकारिक", "वार्षिक प्रतिवेदन", "तथ्याङ्क", "सरकार", "क्षमता", "क्षेत्रफल", "यात्री", "official", "annual report"]
+    preferred_domains: [".np", ".gov.np", ".edu.np"]
+    primary_search_engines: ["Google Nepal", "Bing cross-check"]
+    search_engine_profile_required: true
+  Laos:
+    languages: ["lo", "en", "fr"]
+    official_languages: ["lo"]
+    official_source_terms: ["ທາງການ", "ລາຍງານປະຈຳປີ", "ສະຖິຕິ", "ລັດຖະບານ", "official", "statistics", "capacity"]
+    preferred_domains: [".la", ".gov.la"]
+    primary_search_engines: ["Google Laos", "Bing cross-check"]
+    search_engine_profile_required: true
+  Brunei:
+    languages: ["ms", "en"]
+    official_languages: ["ms"]
+    official_source_terms: ["rasmi", "laporan tahunan", "statistik", "kerajaan", "kapasiti", "keluasan", "bilangan bilik", "official"]
+    preferred_domains: [".bn", ".gov.bn"]
+    primary_search_engines: ["Google Brunei", "Bing cross-check"]
+    search_engine_profile_required: true
+  Afghanistan:
+    languages: ["fa", "ps", "en"]
+    official_languages: ["fa", "ps"]
+    official_source_terms: ["رسمی", "گزارش سالانه", "آمار", "وزارت", "ظرفیت", "مساحت", "official", "annual report", "statistics"]
+    preferred_domains: [".af", ".gov.af"]
+    primary_search_engines: ["Google Afghanistan", "Bing cross-check"]
+    search_engine_profile_required: true
+  Yemen:
+    languages: ["ar", "en"]
+    official_languages: ["ar"]
+    official_source_terms: ["رسمي", "تقرير سنوي", "إحصائيات", "وزارة", "عدد المسافرين", "السعة", "مساحة", "عدد الغرف", "official"]
+    preferred_domains: [".ye", ".gov.ye"]
+    primary_search_engines: ["Google Yemen Arabic", "Bing cross-check"]
+    search_engine_profile_required: true
+  Lebanon:
+    languages: ["ar", "fr", "en"]
+    official_languages: ["ar"]
+    official_source_terms: ["رسمي", "تقرير سنوي", "إحصائيات", "وزارة", "عدد المسافرين", "السعة", "مساحة", "statistiques", "rapport annuel"]
+    preferred_domains: [".lb", ".gov.lb"]
+    primary_search_engines: ["Google Lebanon Arabic", "Bing cross-check"]
+    search_engine_profile_required: true
+  Bahrain:
+    languages: ["ar", "en"]
+    official_languages: ["ar"]
+    official_source_terms: ["رسمي", "تقرير سنوي", "إحصائيات", "حكومة", "عدد المسافرين", "السعة", "مساحة", "official", "statistics"]
+    preferred_domains: [".bh", ".gov.bh"]
+    primary_search_engines: ["Google Bahrain Arabic", "Bing cross-check"]
+    search_engine_profile_required: true
+  Kazakhstan:
+    languages: ["kk", "ru", "en"]
+    official_languages: ["kk", "ru"]
+    official_source_terms:
+      - "ресми"
+      - "жылдық есеп"
+      - "статистика"
+      - "жолаушылар ағыны"
+      - "сыйымдылығы"
+      - "алаңы"
+      - "официальный"
+      - "годовой отчет"
+      - "пассажиропоток"
+      - "вместимость"
+      - "арендопригодная площадь"
+      - "номерной фонд"
+    preferred_domains: [".kz", ".gov.kz", ".edu.kz"]
+    primary_search_engines: ["Google Kazakhstan", "Yandex Kazakhstan", "DuckDuckGo cross-check"]
+    search_engine_profile_required: true
+  Uzbekistan:
+    languages: ["uz", "ru", "en"]
+    official_languages: ["uz"]
+    official_source_terms:
+      - "rasmiy"
+      - "yillik hisobot"
+      - "statistika"
+      - "yo'lovchilar oqimi"
+      - "sig'imi"
+      - "maydoni"
+      - "xonalar soni"
+      - "официальный"
+      - "годовой отчет"
+      - "пассажиропоток"
+      - "вместимость"
+      - "арендопригодная площадь"
+      - "номерной фонд"
+    preferred_domains: [".uz", ".gov.uz", ".edu.uz"]
+    primary_search_engines: ["Google Uzbekistan", "Yandex Uzbekistan", "DuckDuckGo cross-check"]
+    search_engine_profile_required: true
+  Georgia:
+    languages: ["ka", "en", "ru"]
+    official_languages: ["ka"]
+    official_source_terms: ["ოფიციალური", "წლიური ანგარიში", "სტატისტიკა", "მთავრობა", "ტევადობა", "ფართობი", "official", "statistics"]
+    preferred_domains: [".ge", ".gov.ge"]
+    primary_search_engines: ["Google Georgia", "Bing cross-check"]
+    search_engine_profile_required: true
+  Azerbaijan:
+    languages: ["az", "en", "ru"]
+    official_languages: ["az"]
+    official_source_terms: ["rəsmi", "illik hesabat", "statistika", "hökumət", "tutum", "sahə", "sərnişin", "official"]
+    preferred_domains: [".az", ".gov.az"]
+    primary_search_engines: ["Google Azerbaijan", "Bing cross-check"]
+    search_engine_profile_required: true
+  Kyrgyzstan:
+    languages: ["ky", "ru", "en"]
+    official_languages: ["ky", "ru"]
+    official_source_terms: ["расмий", "жылдык отчет", "статистика", "өкмөт", "официальный", "годовой отчет", "пассажиропоток", "вместимость"]
+    preferred_domains: [".kg", ".gov.kg"]
+    primary_search_engines: ["Google Kyrgyzstan", "Yandex cross-check", "Bing cross-check"]
+    search_engine_profile_required: true
+  Mongolia:
+    languages: ["mn", "en"]
+    official_languages: ["mn"]
+    official_source_terms: ["албан ёсны", "жилийн тайлан", "статистик", "засгийн газар", "зорчигч", "багтаамж", "талбай", "official"]
+    preferred_domains: [".mn", ".gov.mn"]
+    primary_search_engines: ["Google Mongolia", "Bing cross-check"]
+    search_engine_profile_required: true
+  Tajikistan:
+    languages: ["tg", "ru", "en"]
+    official_languages: ["tg"]
+    official_source_terms: ["расмӣ", "ҳисоботи солона", "омор", "ҳукумат", "официальный", "годовой отчет", "вместимость", "площадь"]
+    preferred_domains: [".tj", ".gov.tj"]
+    primary_search_engines: ["Google Tajikistan", "Yandex cross-check", "Bing cross-check"]
+    search_engine_profile_required: true
+  Turkmenistan:
+    languages: ["tk", "ru", "en"]
+    official_languages: ["tk"]
+    official_source_terms: ["resmi", "ýyllyk hasabat", "statistika", "hökümet", "официальный", "годовой отчет", "вместимость", "площадь"]
+    preferred_domains: [".tm", ".gov.tm"]
+    primary_search_engines: ["Google Turkmenistan", "Yandex cross-check", "Bing cross-check"]
+    search_engine_profile_required: true
+  Armenia:
+    languages: ["hy", "en", "ru"]
+    official_languages: ["hy"]
+    official_source_terms: ["պաշտոնական", "տարեկան հաշվետվություն", "վիճակագրություն", "կառավարություն", "տարողություն", "մակերես", "official", "statistics"]
+    preferred_domains: [".am", ".gov.am"]
+    primary_search_engines: ["Google Armenia", "Bing cross-check"]
+    search_engine_profile_required: true
+  France:
+    languages: ["fr", "en"]
+    official_languages: ["fr"]
+    official_source_terms:
+      - "statistiques"
+      - "rapport annuel"
+      - "officiel"
+      - "ministère"
+      - "trafic passagers"
+      - "fréquentation"
+      - "capacité"
+      - "surface locative"
+      - "surface d'exposition"
+      - "nombre de chambres"
+    preferred_domains: [".fr", ".gouv.fr", "data.gouv.fr"]
+    primary_search_engines: ["Google France", "Qwant", "Bing cross-check"]
+    search_engine_profile_required: true
   Nigeria:
     languages: ["en"]
-    official_source_terms: ["official", "annual report", "statistics", "authority"]
-    preferred_domains: [".ng", ".gov.ng"]
+    official_languages: ["en"]
+    official_source_terms: ["official", "annual report", "statistics", "authority", "capacity", "gross leasable area", "rooms", "beds", "students"]
+    preferred_domains: [".ng", ".gov.ng", ".com.ng", ".edu.ng"]
+    primary_search_engines: ["Google Nigeria", "Bing cross-check"]
+    search_engine_profile_required: true
+  Pakistan:
+    languages: ["en", "ur"]
+    official_languages: ["ur", "en"]
+    official_source_terms:
+      - "official"
+      - "annual report"
+      - "statistics"
+      - "authority"
+      - "passenger traffic"
+      - "terminal capacity"
+      - "seating capacity"
+      - "gross leasable area"
+      - "floor area"
+      - "bed capacity"
+      - "students"
+      - "مسافر"
+      - "سالانہ رپورٹ"
+      - "گنجائش"
+      - "رقبہ"
+      - "طلبہ"
+    preferred_domains: [".gov.pk", ".pk", ".edu.pk", ".org.pk", ".com.pk"]
+    primary_search_engines: ["Google Pakistan", "Bing cross-check"]
+    search_engine_profile_required: true
   Panama:
     languages: ["es", "en"]
     official_source_terms: ["estadísticas", "informe anual", "oficial", "gobierno"]
@@ -179,6 +630,49 @@ country_profiles:
     languages: ["en", "fr"]
     official_source_terms: ["official", "statistics", "annual report", "rapport annuel"]
     preferred_domains: [".rw", ".gov.rw"]
+  Russia:
+    languages: ["ru", "en"]
+    official_languages: ["ru"]
+    official_source_terms: ["статистика", "годовой отчет", "официальный", "министерство", "пассажиропоток"]
+    preferred_domains: [".ru", ".gov.ru", ".рф"]
+    primary_search_engines: ["Yandex", "Google cross-check"]
+    search_engine_profile_required: true
+  Switzerland:
+    languages: ["de", "fr", "it", "en"]
+    official_languages: ["de", "fr", "it", "rm"]
+    official_source_terms:
+      - "Statistik"
+      - "Geschäftsbericht"
+      - "offiziell"
+      - "Passagiere"
+      - "Besucher"
+      - "Kapazität"
+      - "Bruttomietfläche"
+      - "Ausstellungsfläche"
+      - "statistiques"
+      - "rapport annuel"
+      - "surface locative"
+      - "superficie espositiva"
+    preferred_domains: [".ch", ".admin.ch", "opendata.swiss"]
+    primary_search_engines: ["Google Switzerland", "Swisscows", "Bing cross-check"]
+    search_engine_profile_required: true
+  United Arab Emirates:
+    languages: ["ar", "en"]
+    official_languages: ["ar"]
+    official_source_terms:
+      - "رسمي"
+      - "حكومة"
+      - "دائرة الثقافة والسياحة"
+      - "الهيئة العامة للشؤون الإسلامية"
+      - "عدد الزوار"
+      - "مساحة"
+      - "سعة المصلين"
+      - "official"
+      - "statistics"
+      - "tourism"
+    preferred_domains: [".ae", ".gov.ae", "u.ae", "visitabudhabi.ae", "visitdubai.com"]
+    primary_search_engines: ["Google UAE Arabic", "Bing cross-check"]
+    search_engine_profile_required: true
   Sao Tome and Principe:
     languages: ["pt", "en"]
     official_source_terms: ["estatísticas", "relatório anual", "oficial", "governo"]
@@ -188,9 +682,12 @@ country_profiles:
     official_source_terms: ["official", "annual report", "statistics", "authority"]
     preferred_domains: [".sl", ".gov.sl"]
   South Africa:
-    languages: ["en"]
-    official_source_terms: ["official", "annual report", "statistics", "authority"]
-    preferred_domains: [".za", ".gov.za"]
+    languages: ["en", "af", "zu"]
+    official_languages: ["en", "af", "zu", "xh", "nso", "tn", "st", "ts", "ss", "ve", "nr", "sfs"]
+    official_source_terms: ["official", "annual report", "statistics", "authority", "capacity", "gross leasable area", "rooms", "beds", "students", "amptelik", "kapasiteit"]
+    preferred_domains: [".za", ".gov.za", ".co.za", ".ac.za"]
+    primary_search_engines: ["Google South Africa", "Bing cross-check"]
+    search_engine_profile_required: true
   Sri Lanka:
     languages: ["en", "si", "ta"]
     official_source_terms: ["official", "annual report", "statistics", "authority", "රජය", "அரசு"]
@@ -200,9 +697,53 @@ country_profiles:
     official_source_terms: ["statistieken", "jaarverslag", "officieel", "official"]
     preferred_domains: [".sr", ".gov.sr"]
   Tanzania:
-    languages: ["en"]
-    official_source_terms: ["official", "annual report", "statistics", "authority"]
-    preferred_domains: [".tz", ".go.tz"]
+    languages: ["sw", "en"]
+    official_languages: ["sw", "en"]
+    official_source_terms: ["rasmi", "takwimu", "ripoti ya mwaka", "idadi ya abiria", "uwezo", "eneo", "vyumba", "vitanda", "wanafunzi", "official", "annual report"]
+    preferred_domains: [".tz", ".go.tz", ".co.tz", ".ac.tz"]
+    primary_search_engines: ["Google Tanzania", "Bing cross-check"]
+    search_engine_profile_required: true
+  Thailand:
+    languages: ["th", "en"]
+    official_languages: ["th"]
+    official_source_terms:
+      - "ทางการ"
+      - "สถิติ"
+      - "รายงานประจำปี"
+      - "รายงานผลการดำเนินงาน"
+      - "จำนวนผู้โดยสาร"
+      - "จำนวนที่นั่ง"
+      - "พื้นที่ให้เช่า"
+      - "พื้นที่จัดแสดง"
+      - "จำนวนห้องพัก"
+      - "ความจุ"
+    preferred_domains: [".th", ".go.th", ".or.th", ".co.th", "data.go.th", "set.or.th"]
+    primary_search_engines: ["Google Thailand Thai", "local SearXNG cross-check"]
+    search_engine_profile_required: true
+  Vietnam:
+    languages: ["vi", "en"]
+    official_languages: ["vi"]
+    official_source_terms:
+      - "chính thức"
+      - "thống kê"
+      - "báo cáo thường niên"
+      - "lưu lượng hành khách"
+      - "số lượt hành khách"
+      - "sức chứa"
+      - "số chỗ ngồi"
+      - "diện tích cho thuê"
+      - "diện tích triển lãm"
+      - "số phòng"
+    preferred_domains: [".vn", ".gov.vn", ".com.vn", "data.gov.vn"]
+    primary_search_engines: ["Google Vietnam Vietnamese", "Coc Coc cross-check", "local SearXNG cross-check"]
+    search_engine_profile_required: true
+  Uganda:
+    languages: ["en", "sw"]
+    official_languages: ["en", "sw"]
+    official_source_terms: ["official", "annual report", "statistics", "authority", "capacity", "gross leasable area", "rooms", "beds", "students", "rasmi", "uwezo"]
+    preferred_domains: [".ug", ".go.ug", ".co.ug", ".ac.ug"]
+    primary_search_engines: ["Google Uganda", "Bing cross-check"]
+    search_engine_profile_required: true
   Zambia:
     languages: ["en"]
     official_source_terms: ["official", "annual report", "statistics", "authority"]
@@ -220,6 +761,7 @@ language_profiles:
       transport_hub: ["daily ridership", "passenger traffic", "station passengers"]
       hospital: ["beds", "outpatients", "annual patients"]
       university: ["students", "enrollment", "campus population"]
+      mosque: ["mosque area", "gross floor area", "annual visitors", "daily visitors", "worshipper capacity"]
   pt:
     metric_terms:
       airport_terminal: ["movimento de passageiros", "tráfego de passageiros", "estatísticas aeroportuárias"]
@@ -231,6 +773,7 @@ language_profiles:
       transport_hub: ["passageiros por dia", "movimento de passageiros", "estação"]
       hospital: ["leitos", "atendimentos", "pacientes"]
       university: ["alunos", "estudantes", "matrículas"]
+      mosque: ["área da mesquita", "visitantes anuais", "capacidade de fiéis"]
   es:
     metric_terms:
       airport_terminal: ["tráfico de pasajeros", "movimiento de pasajeros", "estadísticas aeroportuarias"]
@@ -242,6 +785,19 @@ language_profiles:
       transport_hub: ["pasajeros diarios", "tráfico de pasajeros", "estación"]
       hospital: ["camas", "consultas externas", "pacientes"]
       university: ["estudiantes", "matrícula", "alumnos"]
+      mosque: ["área de la mezquita", "visitantes anuales", "capacidad de fieles"]
+  vi:
+    metric_terms:
+      airport_terminal: ["lưu lượng hành khách hàng năm", "số lượt hành khách", "thống kê sân bay"]
+      stadium: ["sức chứa", "số chỗ ngồi", "khán giả"]
+      convention_center: ["diện tích triển lãm", "diện tích tổ chức sự kiện", "sức chứa hội nghị"]
+      mall_mixed_use: ["tổng diện tích cho thuê", "diện tích sàn bán lẻ", "lượt khách hàng năm"]
+      luxury_hotel_mice: ["số phòng", "sức chứa phòng tiệc", "diện tích hội nghị"]
+      office_government: ["diện tích văn phòng", "diện tích sàn", "diện tích cho thuê thuần"]
+      transport_hub: ["lượng khách hàng ngày", "số lượt hành khách", "lưu lượng nhà ga"]
+      hospital: ["số giường bệnh", "lượt khám ngoại trú", "số bệnh nhân"]
+      university: ["số sinh viên", "quy mô đào tạo", "số người trong khuôn viên"]
+      mosque: ["diện tích nhà thờ Hồi giáo", "số lượt khách", "sức chứa tín đồ"]
   fr:
     metric_terms:
       airport_terminal: ["trafic passagers", "mouvement passagers", "statistiques aéroportuaires"]
@@ -253,6 +809,19 @@ language_profiles:
       transport_hub: ["passagers par jour", "trafic voyageurs", "gare"]
       hospital: ["lits", "consultations externes", "patients"]
       university: ["étudiants", "inscriptions", "effectifs"]
+      mosque: ["surface de la mosquée", "visiteurs annuels", "capacité de fidèles"]
+  mg:
+    metric_terms:
+      airport_terminal: ["isan'ny mpandeha", "fifamoivoizan'ny mpandeha", "antontan'isa seranam-piaramanidina"]
+      stadium: ["fahafahana mandray olona", "toerana mipetraka", "mpijery"]
+      convention_center: ["velaran'ny fampirantiana", "efitra fivoriana", "fahafahana mandray olona"]
+      mall_mixed_use: ["velarana hofaina", "ivon-toeram-pivarotana", "isan'ny mpitsidika"]
+      luxury_hotel_mice: ["efitra", "isan'ny efitra", "efitra fivoriana", "fahafahana mandray vahiny"]
+      office_government: ["velaran'ny birao", "trano birao", "foiben-toerana"]
+      transport_hub: ["mpandeha isan'andro", "fifamoivoizan'ny mpandeha", "gara"]
+      hospital: ["fandriana", "marary", "fitsaboana ivelany"]
+      university: ["mpianatra", "fisoratana anarana", "oniversite"]
+      mosque: ["velaran'ny moske", "mpitsidika isan-taona", "fahafahan'ny mpivavaka"]
   ar:
     metric_terms:
       airport_terminal: ["حركة الركاب", "عدد المسافرين", "إحصاءات المطار"]
@@ -264,6 +833,31 @@ language_profiles:
       transport_hub: ["عدد الركاب اليومي", "حركة الركاب", "محطة"]
       hospital: ["الأسرّة", "المرضى", "العيادات الخارجية"]
       university: ["الطلاب", "التسجيل", "الحرم الجامعي"]
+      mosque: ["مساحة المسجد", "عدد الزوار", "الزوار السنويون", "سعة المصلين"]
+  th:
+    metric_terms:
+      airport_terminal: ["จำนวนผู้โดยสารประจำปี", "ปริมาณผู้โดยสาร", "สถิติท่าอากาศยาน", "ขีดความสามารถอาคารผู้โดยสาร"]
+      stadium: ["ความจุสนามกีฬา", "จำนวนที่นั่ง", "อัฒจันทร์", "ผู้ชม"]
+      convention_center: ["พื้นที่จัดแสดง", "พื้นที่จัดงาน", "พื้นที่ประชุม", "ความจุห้องประชุม"]
+      mall_mixed_use: ["พื้นที่ให้เช่า", "พื้นที่ขาย", "พื้นที่ศูนย์การค้า", "จำนวนผู้ใช้บริการ"]
+      luxury_hotel_mice: ["จำนวนห้องพัก", "ห้องบอลรูม", "พื้นที่จัดประชุม", "รองรับผู้เข้าร่วม"]
+      office_government: ["พื้นที่สำนักงาน", "พื้นที่เช่าสุทธิ", "พื้นที่อาคาร", "อัตราการเช่า"]
+      transport_hub: ["จำนวนผู้โดยสารรายวัน", "จำนวนผู้โดยสารรายสถานี", "สถานีเปลี่ยนเส้นทาง", "จำนวนสาย"]
+      hospital: ["จำนวนเตียง", "ผู้ป่วยนอก", "จำนวนผู้ป่วย", "รายงานประจำปีโรงพยาบาล"]
+      university: ["จำนวนนักศึกษา", "นักศึกษาทั้งหมด", "ประชากรในวิทยาเขต"]
+      mosque: ["พื้นที่มัสยิด", "พื้นที่ห้องละหมาด", "จำนวนผู้มาเยือน", "ความจุผู้ละหมาด"]
+  ru:
+    metric_terms:
+      airport_terminal: ["пассажиропоток", "обслужено пассажиров", "пропускная способность", "статистика аэропорта"]
+      stadium: ["вместимость", "зрителей", "мест", "количество зрительских мест"]
+      convention_center: ["выставочная площадь", "площадь павильонов", "конференц-залы", "вместимость"]
+      mall_mixed_use: ["арендопригодная площадь", "арендуемая площадь", "GLA", "посещаемость"]
+      luxury_hotel_mice: ["номерной фонд", "количество номеров", "конференц-залы", "банкетный зал"]
+      office_government: ["офисная площадь", "арендопригодная площадь", "бизнес-центр", "штаб-квартира"]
+      transport_hub: ["пассажиропоток", "пассажиров в сутки", "станция", "пересадочный узел"]
+      hospital: ["коек", "койки", "пациентов", "посещений"]
+      university: ["студентов", "численность студентов", "обучающихся", "кампус"]
+      mosque: ["площадь мечети", "посетителей в год", "вместимость молящихся"]
   nl:
     metric_terms:
       airport_terminal: ["passagiersverkeer", "aantal passagiers", "luchthaven statistieken"]
@@ -275,6 +869,7 @@ language_profiles:
       transport_hub: ["dagelijkse reizigers", "passagiersverkeer", "station"]
       hospital: ["bedden", "patiënten", "polikliniek"]
       university: ["studenten", "inschrijvingen", "campus"]
+      mosque: ["moskee oppervlakte", "jaarlijkse bezoekers", "capaciteit gelovigen"]
   km:
     metric_terms:
       airport_terminal: ["passenger traffic", "airport statistics", "អ្នកដំណើរ"]
@@ -330,4 +925,5 @@ query_templates:
   metric_extraction:
     - "{property_name} {metric_terms} {country}"
   firecrawl_gap_fill:
+    - "{property_name} {city} {country} {metric_terms} {official_terms}"
     - "{property_name} {country} {metric_terms} {official_terms}"

@@ -37,6 +37,68 @@ phases:
       - country
       - property_name
 
+deep_candidate_expansion:
+  description: "Reusable two-stage escalation for country or regional scans that need deeper candidate-pool coverage."
+  trigger_when_any:
+    - "A target scene remains below its requested net-new count after country-level discovery and structured-source intake."
+    - "National directory results are saturated by known properties or repeated URLs."
+    - "The user explicitly requests deep insight, broader coverage, or city-level precision."
+  stage_1_expand_source_breadth:
+    sequence:
+      - local_government_regulator_and_statistics
+      - official_owner_operator_and_brand
+      - industry_association_and_vertical_directory
+      - developer_architect_engineer_contractor_project_page
+      - event_organizer_tourism_authority_and_local_business_directory
+      - international_directory_or_aggregator_fallback
+    rules:
+      - "Use official/local language and local domains before international fallback sources."
+      - "Record the source channel, domain class, query language, adopted status, and skipped reason in the search manifest."
+      - "Broaden domains, not evidence standards: generic city/topic pages remain discovery leads only."
+  stage_2_city_level_precision:
+    city_selection_order:
+      - national_capital_and_primary_metro
+      - major_economic_and_population_centers
+      - regional_capitals_and_secondary_cities
+      - airport_port_border_tourism_and_event_nodes
+      - low_coverage_cities_identified_from_active_scene_counts
+    query_dimensions:
+      - city
+      - scene_type
+      - localized_primary_metric_term
+      - official_or_vertical_source_hint
+    query_template: "{city} {country} {scene_local_term} {primary_metric_local_term} {source_hint}"
+    rules:
+      - "Compute current active counts and known identities before creating the city matrix."
+      - "Do not expand completed scenes unless the user explicitly requests continued saturation."
+      - "Deduplicate city aliases, property aliases, URLs, and queries before any Firecrawl request."
+  execution_guards:
+    search_before_scrape: true
+    persist_every_search_manifest: true
+    max_local_firecrawl_subprocesses_per_agent: 1
+    prefilter_before_scrape:
+      - known_property_identity
+      - known_url
+      - country_bbox
+      - scene_identity
+      - objective_metric_likelihood
+    stop_conditions:
+      - "The scoped scene target is met after the active quality gate."
+      - "New searches return only known, non-operational, generic, or non-quantified entities."
+      - "Additional admission would require weakening identity, coordinate, operating-status, or objective-metric gates."
+  required_report_fields:
+    - baseline_active_count_by_scene
+    - requested_net_new_count_by_scene
+    - accepted_and_active_count_by_scene
+    - shortfall_by_scene
+    - source_channel_and_domain_distribution
+    - city_search_coverage
+    - known_property_skipped_count
+    - known_url_skipped_count
+    - rejected_leads_with_executable_next_actions
+    - local_firecrawl_request_count
+    - cloud_credits_used
+
 source_tier_policy:
   tier_1:
     - official authority or regulator KPI/statistics page
@@ -55,7 +117,7 @@ source_tier_policy:
     - public aggregator
 
 evidence_acceptance_rules:
-  - "Every surfaced candidate must have a property-level name, coordinate, hero image, and objective scene metric."
+  - "Every surfaced candidate must have a property-level name, coordinate, and objective scene metric. Hero image is independently enriched and may remain empty when no authentic usable image is available."
   - "A candidate passes the evidence gate with at least one Tier 1/2 source or two independent Tier 3 sources."
   - "Official identity/profile pages strengthen entity evidence but do not prove numeric demand metrics unless the metric is explicit."
   - "Do not label total development area as retail GLA; use mixed_use_area and Proxy unless GLA is explicitly stated."
@@ -395,3 +457,36 @@ scene_strategies:
     build_status_queries:
       - "{property_name} cruise terminal indoor 5G coverage operator announcement"
       - "{property_name} cruise port DAS indoor network mobile operator"
+
+  mosque:
+    scan_priority: 55
+    priority_band: secondary_landmark
+    objective_indicators:
+      - mosque_area
+      - gross_floor_area
+      - prayer_hall_area
+      - annual_visitors
+      - annual_visits
+      - daily_visitors
+    discovery_queries:
+      - "{country} grand mosque official area annual visitors"
+      - "{country} largest mosque area visitor capacity official"
+      - "{country} mosque عدد الزوار مساحة المسجد"
+    candidate_metric_queries:
+      - "{property_name} mosque area official"
+      - "{property_name} annual visitors official"
+      - "{property_name} مساحة المسجد عدد الزوار"
+    strengthening_queries:
+      - "{property_name} mosque area second source"
+      - "{property_name} visitors tourism statistics second source"
+    preferred_channels:
+      - official mosque site
+      - religious affairs authority
+      - tourism authority
+      - government project page
+    fallback_channels:
+      - cultural/tourism profile for identity only
+      - Wikipedia/Wikimedia for image and coordinates
+    build_status_queries:
+      - "{property_name} mosque indoor 5G coverage operator announcement"
+      - "{property_name} mosque DAS indoor mobile network"
